@@ -1,0 +1,2041 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wallet Hunter — Simulated Key-Scanner Console</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%23f7a600'/><text x='16' y='22' font-size='16' font-weight='bold' text-anchor='middle' font-family='Arial' fill='%23111'>W</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0b0e11; --bg2:#0e1116; --panel:#161a20; --panel2:#1c2129; --panel3:#232933;
+  --border:#252c36; --border2:#303945;
+  --text:#eaecef; --muted:#848e9c; --dim:#5e6673;
+  --accent:#f7a600; --up:#20b26c; --down:#ef454a;
+  --mono:'JetBrains Mono','SFMono-Regular',Consolas,'Liberation Mono',monospace;
+  --sans:'IBM Plex Sans',-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+}
+html,body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;overflow-x:clip}
+::selection{background:rgba(247,166,0,.28)}
+button{font-family:var(--sans)}
+
+/* ===== Top bar ===== */
+.topbar{height:56px;display:flex;align-items:center;gap:28px;padding:0 20px;border-bottom:1px solid var(--border);background:var(--bg2);position:sticky;top:0;z-index:50}
+.logo{display:flex;align-items:center;gap:10px;font-weight:700;font-size:17px;white-space:nowrap}
+.logo-mark{width:32px;height:32px;border-radius:8px;background:var(--accent);color:#141414;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px}
+.logo b{color:var(--accent);font-weight:700}
+.nav{display:flex;gap:22px}
+.nav a{color:var(--muted);text-decoration:none;font-size:13.5px;padding:19px 0;position:relative}
+.nav a:hover{color:var(--text)}
+.nav a.active{color:var(--text);font-weight:600}
+.nav a.active::after{content:'';position:absolute;left:0;right:0;bottom:0;height:2px;background:var(--accent)}
+.top-right{margin-left:auto;display:flex;align-items:center;gap:14px}
+.acct-chip{display:flex;flex-direction:column;align-items:flex-end;line-height:1.25}
+.acct-chip .lbl{font-size:10px;color:var(--dim);letter-spacing:.5px}
+.acct-chip .val{font-family:var(--mono);font-size:13px;color:var(--accent)}
+.avatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#2b3340,#3d4757);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#cdd6e4;flex-shrink:0}
+
+/* ===== Simulation notice ===== */
+.notice{display:flex;align-items:center;gap:12px;margin:14px 20px 0;padding:10px 14px;border:1px solid rgba(247,166,0,.35);background:rgba(247,166,0,.07);border-radius:10px;color:#f0b04c;font-size:12.5px;line-height:1.5}
+.notice .tag{background:var(--accent);color:#141414;font-weight:700;font-size:10px;padding:3px 8px;border-radius:4px;letter-spacing:.6px;flex-shrink:0}
+
+/* ===== Layout ===== */
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 372px;gap:16px;padding:16px 20px 8px;max-width:1340px;margin:0 auto}
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:14px}
+.hunter-panel{padding:18px 18px 14px;display:flex;flex-direction:column;gap:16px}
+.panel-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.panel-head h1{font-size:21px;font-weight:700;display:flex;align-items:center;gap:9px}
+.panel-head .sub{color:var(--muted);font-size:12.5px;margin-top:4px}
+.badge{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;padding:5px 11px;border-radius:20px;border:1px solid var(--border2);color:var(--muted);white-space:nowrap;margin-top:2px}
+.badge .dot{width:7px;height:7px;border-radius:50%;background:var(--dim)}
+.badge.running{color:var(--up);border-color:rgba(32,178,108,.4)}
+.badge.running .dot{background:var(--up);animation:pulse 1.1s infinite}
+.badge.paused{color:var(--accent);border-color:rgba(247,166,0,.4)}
+.badge.paused .dot{background:var(--accent)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.2}}
+
+/* ===== Stat cards ===== */
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px}
+.stat{background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:8px 11px;min-width:0}
+.stat .lbl{font-size:9.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px}
+.stat .val{font-family:var(--mono);font-size:clamp(13px,3.4vw,17px);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stat .val.accent{color:var(--accent)}
+.stat .unit{font-size:10px;color:var(--muted);font-weight:400;margin-left:3px}
+/* Editable Keys Checked figure - subtle affordance */
+.stat .val[contenteditable]{cursor:text;outline:none;border-bottom:1px dashed transparent;transition:border-color .15s}
+.stat .val[contenteditable]:hover{border-bottom-color:var(--border2)}
+.stat .val[contenteditable]:focus{border-bottom-color:var(--accent)}
+.stat .badge{margin-top:5px;padding:3px 9px;font-size:9.5px;gap:5px;border-radius:14px}
+.stat .badge .dot{width:5px;height:5px}
+
+/* ===== Controls ===== */
+.controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.btn{border:none;border-radius:9px;cursor:pointer;font-size:13.5px;font-weight:600;padding:11px 20px;transition:filter .15s,transform .05s,color .15s,border-color .15s}
+.btn:active{transform:translateY(1px)}
+.btn-primary{background:var(--accent);color:#141414;padding:11px 26px}
+.btn-primary:hover{filter:brightness(1.08)}
+.btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--border2)}
+.btn-ghost:hover{color:var(--text);border-color:#3d4757}
+
+/* ===== Target Coins picker (4th stat card — replaces Elapsed) ===== */
+.coin-picks{display:flex;flex-wrap:wrap;gap:4px;margin-top:2px}
+.pick{position:relative;display:inline-flex;align-items:center;gap:4px;padding:3px 6px;border-radius:6px;border:1px solid var(--border2);background:var(--panel);cursor:pointer;font-family:var(--mono);font-size:9.5px;font-weight:700;letter-spacing:.3px;color:var(--muted);user-select:none;white-space:nowrap;transition:border-color .15s,background .15s,color .15s}
+.pick:hover{color:var(--text);border-color:#3d4757}
+.pick input{position:absolute;opacity:0;pointer-events:none}
+.pick .cdot{width:6px;height:6px;border-radius:50%;flex-shrink:0;opacity:.3;transition:opacity .15s}
+.pick.on{color:var(--text)}
+.pick.on .cdot{opacity:1}
+
+/* Scan-rate mini coin badges */
+.scan-coins{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
+.mini-coin{font-family:var(--mono);font-size:8.5px;font-weight:700;letter-spacing:.4px;line-height:1;padding:2px 4px;border-radius:4px;border:1px solid transparent;white-space:nowrap}
+
+/* ===== Console ===== */
+.console{background:#07090b;border:1px solid var(--border);border-radius:12px;height:clamp(150px,26vh,220px);overflow-y:auto;overflow-x:hidden;padding:12px 14px;font-family:var(--mono);font-size:10.5px;line-height:1.8}
+.console::-webkit-scrollbar{width:8px}
+.console::-webkit-scrollbar-thumb{background:#232a33;border-radius:4px}
+.line{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.line .t{color:#4a5361}
+.line .lbl{color:#39424e;padding:0 2px}
+.line .k{color:#d19a66}
+.line .a{color:#61afef}
+.line .b{color:#5e6673}
+.line .miss{color:#3d454f}
+.line.match{color:var(--up);background:rgba(32,178,108,.08);border-radius:6px;padding:1px 6px}
+.line.match .k{color:#7ee2b0}
+.line.match .a{color:#9cc9f5}
+.line.sys{color:var(--accent)}
+
+/* ===== Sidebar ===== */
+.sidebar{display:flex;flex-direction:column;gap:16px;min-width:0}
+.side-panel{padding:16px}
+.side-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.side-head h2{font-size:15px;font-weight:600}
+.src{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:12px;letter-spacing:.4px}
+.src.live{color:var(--up);background:rgba(32,178,108,.1)}
+.src.sim{color:var(--accent);background:rgba(247,166,0,.1)}
+.coin-row{display:flex;align-items:center;gap:11px;padding:9px 2px;border-top:1px solid var(--border)}
+.coin-row:first-of-type{border-top:none}
+.cicon{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;color:#fff;flex-shrink:0}
+.cmeta{flex:1;min-width:0}
+.cmeta .s{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cmeta .n{font-size:10.5px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+canvas.spark{width:62px;height:26px;flex-shrink:0}
+.cprice-wrap{text-align:right;min-width:84px}
+.cprice{font-family:var(--mono);font-size:13px;font-weight:600;transition:color .4s}
+.cprice.up{color:var(--up)}
+.cprice.down{color:var(--down)}
+.cchg{font-size:10.5px;font-family:var(--mono);padding:2px 6px;border-radius:5px;margin-top:3px;display:inline-block}
+.cchg.up{color:var(--up);background:rgba(32,178,108,.1)}
+.cchg.down{color:var(--down);background:rgba(239,69,74,.1)}
+
+/* ===== Found wallets ===== */
+.found-list{max-height:clamp(200px,36vh,318px);overflow-y:auto;display:flex;flex-direction:column;gap:8px}
+.found-list::-webkit-scrollbar{width:8px}
+.found-list::-webkit-scrollbar-thumb{background:#232a33;border-radius:4px}
+.found-item{display:flex;align-items:center;gap:10px;background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:9px 11px;animation:slideIn .3s ease}
+@keyframes slideIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+.chain-tag{font-size:9.5px;font-weight:800;padding:3px 6px;border-radius:5px;color:#fff;flex-shrink:0;letter-spacing:.4px}
+.fi-mid{flex:1;min-width:0}
+.fi-addr{font-family:var(--mono);font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fi-time{font-size:10px;color:var(--dim);font-family:var(--mono);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fi-right{text-align:right;flex-shrink:0}
+.fi-bal{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--up)}
+.fi-usd{font-size:10.5px;color:var(--muted);font-family:var(--mono);margin-top:2px}
+.fi-copy{background:none;border:1px solid var(--border2);color:var(--muted);border-radius:6px;width:26px;height:26px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.fi-copy:hover{color:var(--accent);border-color:var(--accent)}
+.empty{color:var(--dim);font-size:12px;text-align:center;padding:22px 10px;border:1px dashed var(--border2);border-radius:10px;line-height:1.7}
+.pop{animation:pop .55s ease}
+@keyframes pop{0%{box-shadow:0 0 0 0 rgba(247,166,0,.5)}100%{box-shadow:0 0 0 16px rgba(247,166,0,0)}}
+
+/* ===== Withdraw value bar (above found list) ===== */
+.wd-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:8px 10px;margin-bottom:10px}
+.wd-info{display:flex;align-items:baseline;gap:5px;min-width:0}
+.wd-lbl{font-size:9.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.6px;white-space:nowrap}
+.wd-amt{font-family:var(--mono);font-size:15px;font-weight:700;color:var(--up);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.wd-unit{font-size:10px;color:var(--muted);white-space:nowrap}
+.wd-div{width:1px;height:14px;background:var(--border2);align-self:center;flex-shrink:0}
+.wd-count{font-family:var(--mono);font-size:14px;font-weight:700;color:var(--accent);white-space:nowrap}
+.wd-btn{border:none;border-radius:8px;background:var(--accent);color:#141414;font-weight:700;font-size:11px;padding:7px 12px;cursor:pointer;flex-shrink:0;transition:filter .15s,transform .05s}
+.wd-btn:hover:not(:disabled){filter:brightness(1.08)}
+.wd-btn:active:not(:disabled){transform:translateY(1px)}
+.wd-btn:disabled{opacity:.4;cursor:not-allowed}
+
+/* ===== Search target row ===== */
+.tgt-row{display:flex;align-items:center;gap:7px;margin:-5px 0 0}
+.tgt-row .wd-lbl{flex-shrink:0}
+.tgt-input{flex:1;min-width:0;background:#0b0e12;border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:var(--mono);font-size:11px;font-weight:600;padding:6px 9px;outline:none;transition:border-color .15s}
+.tgt-input:focus{border-color:var(--accent)}
+.tgt-input::placeholder{color:var(--dim);font-weight:400}
+.tgt-input::-webkit-outer-spin-button,.tgt-input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.tgt-input[type=number]{-moz-appearance:textfield;appearance:textfield}
+.tgt-stat{font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--muted);min-width:34px;text-align:right;white-space:nowrap;flex-shrink:0}
+.tgt-stat.hit{color:var(--up);text-shadow:0 0 8px rgba(32,178,108,.45)}
+
+/* ===== Withdraw modal ===== */
+.wd-overlay{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;background:rgba(4,6,9,.74);backdrop-filter:blur(4px);opacity:0;visibility:hidden;pointer-events:none;transition:opacity .2s ease,visibility .2s ease}
+.wd-overlay.show{opacity:1;visibility:visible;pointer-events:auto}
+.wd-modal{position:relative;width:min(400px,calc(100vw - 32px));max-height:calc(100vh - 40px);overflow-y:auto;background:var(--panel2);border:1px solid var(--border2);border-radius:14px;padding:22px 20px 18px;box-shadow:0 18px 50px rgba(0,0,0,.5);transform:translateY(16px) scale(.95);transition:transform .28s cubic-bezier(.2,.9,.3,1.25);text-align:center}
+.wd-overlay.show .wd-modal{transform:none}
+.wd-x{position:absolute;top:10px;right:10px;width:26px;height:26px;border-radius:7px;border:1px solid transparent;background:none;color:var(--dim);cursor:pointer;display:flex;align-items:center;justify-content:center}
+.wd-x:hover{color:var(--text);border-color:var(--border2)}
+.wd-ic{width:46px;height:46px;border-radius:12px;background:rgba(247,166,0,.12);border:1px solid rgba(247,166,0,.35);display:flex;align-items:center;justify-content:center;margin:0 auto 10px;animation:wdGlow 1.8s ease-in-out infinite}
+@keyframes wdGlow{0%,100%{box-shadow:0 0 0 0 rgba(247,166,0,.35)}50%{box-shadow:0 0 0 9px rgba(247,166,0,0)}}
+.wd-modal h3{font-size:16.5px;font-weight:700}
+.wd-modal h3.ok{color:var(--up)}
+.wd-sub{color:var(--muted);font-size:11.5px;margin-top:4px;line-height:1.5}
+.wd-row{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--panel);border:1px solid var(--border);border-radius:9px;padding:9px 12px;margin-top:13px;font-size:11.5px;color:var(--muted);text-align:left}
+.wd-row b{font-family:var(--mono);color:var(--up);font-size:13px;white-space:nowrap}
+.wd-lbl2{display:block;font-size:11px;color:var(--muted);margin:13px 0 6px;text-align:left}
+.wd-input{width:100%;background:#0b0e12;border:1px solid var(--border2);border-radius:9px;color:var(--text);font-family:var(--mono);font-size:12.5px;padding:11px 12px;outline:none;transition:border-color .15s}
+.wd-input:focus{border-color:var(--accent)}
+.wd-input.bad{border-color:var(--down);animation:wdShake .35s ease}
+@keyframes wdShake{0%,100%{transform:none}20%{transform:translateX(-5px)}40%{transform:translateX(5px)}60%{transform:translateX(-4px)}80%{transform:translateX(4px)}}
+.wd-err{display:none;color:var(--down);font-size:11px;margin-top:7px;text-align:left;line-height:1.5}
+.wd-confirm{width:100%;margin-top:14px}
+.wd-note{font-size:10px;color:var(--dim);margin-top:10px;line-height:1.6}
+.wd-spin{width:44px;height:44px;border-radius:50%;border:3px solid var(--border2);border-top-color:var(--accent);margin:8px auto 14px;animation:wdSpin 1s linear infinite}
+@keyframes wdSpin{to{transform:rotate(360deg)}}
+.wd-prog{height:6px;background:var(--panel);border:1px solid var(--border);border-radius:99px;overflow:hidden;margin:13px 0 10px}
+.wd-prog i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--accent),#ffd27a);border-radius:99px;transition:width 10s linear}
+.wd-proc-step{font-family:var(--mono);font-size:11.5px;color:var(--accent);min-height:17px}
+.wd-dets{margin-top:13px}
+.wd-det{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:7px 2px;border-top:1px solid var(--border);font-size:11.5px;text-align:left}
+.wd-det span{color:var(--dim);flex-shrink:0}
+.wd-det b{font-family:var(--mono);font-weight:500;font-size:11px;color:var(--text);min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right}
+.wd-check{width:64px;height:64px;display:block;margin:4px auto 10px}
+.wd-check circle{stroke:var(--up);stroke-width:2.5;fill:none;stroke-dasharray:164;stroke-dashoffset:164;animation:wdDraw .7s ease forwards}
+.wd-check path{stroke:var(--up);stroke-width:3.5;fill:none;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:40;stroke-dashoffset:40;animation:wdDraw .4s .55s ease forwards}
+@keyframes wdDraw{to{stroke-dashoffset:0}}
+.wd-done-btn{width:100%;margin-top:15px}
+
+/* ===== Withdraw toast ===== */
+.wd-toast{position:fixed;top:66px;right:16px;z-index:110;display:flex;align-items:center;gap:10px;max-width:min(330px,calc(100vw - 32px));background:var(--panel2);border:1px solid rgba(32,178,108,.45);border-radius:12px;padding:11px 14px;box-shadow:0 12px 32px rgba(0,0,0,.45);animation:wdToastIn .35s cubic-bezier(.2,.9,.3,1.2);text-align:left}
+.wd-toast.out{opacity:0;transform:translateX(18px);transition:opacity .35s,transform .35s}
+.wd-toast .tick{width:26px;height:26px;border-radius:50%;background:rgba(32,178,108,.15);color:var(--up);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.wd-toast b{display:block;font-size:12px;color:var(--up)}
+.wd-toast span{display:block;font-size:10.5px;color:var(--muted);font-family:var(--mono);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:250px}
+@keyframes wdToastIn{from{opacity:0;transform:translateX(28px)}to{opacity:1;transform:none}}
+
+/* ===== Footer ===== */
+footer{max-width:1340px;margin:0 auto;padding:6px 20px 30px;color:var(--dim);font-size:11px;line-height:1.7}
+footer b{color:var(--muted)}
+.bottom-notice{max-width:1340px;margin:0 auto;padding:0 20px 28px;color:var(--muted);font-size:11.5px;line-height:1.7;text-align:center}
+.bottom-notice b{color:#f0b04c}
+
+@media(max-width:1020px){
+  .layout{grid-template-columns:minmax(0,1fr)}
+  .nav{display:none}
+}
+@media(max-width:760px){
+  .topbar{height:52px;padding:0 14px;gap:14px}
+  .acct-chip{display:none}
+  .notice{margin:10px 12px 0;padding:9px 12px;font-size:12px;gap:9px}
+  .layout{padding:12px 12px 8px;gap:12px}
+  .hunter-panel{padding:14px 14px 12px;gap:13px}
+  .panel-head h1{font-size:18px}
+  .panel-head .sub{font-size:11.5px}
+  .stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+  .stat{padding:8px 10px}
+  .pick{font-size:10px;padding:4px 7px}
+  .console{font-size:10px;padding:10px 12px}
+  .side-panel{padding:14px}
+  .coin-row{gap:9px;padding:8px 2px}
+  footer{padding:6px 12px 10px}
+  .bottom-notice{padding:0 12px 24px}
+  .wd-toast{top:58px;right:10px}
+  .wd-modal{padding:18px 15px 14px}
+}
+@media(max-width:380px){
+  .stat{padding:8px 9px}
+  .stat .val{font-size:12.5px}
+  .btn-primary{padding:11px 18px}
+  canvas.spark{width:50px}
+  .wd-btn{padding:7px 11px;font-size:11px}
+  .wd-amt{font-size:13.5px}
+}
+/* ===== Access gate (login page) ===== */
+.lg-gate{position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px;background:radial-gradient(900px 480px at 50% -8%,rgba(247,166,0,.07),transparent 60%),var(--bg)}
+.lg-gate.hide{display:none}
+.lg-card{width:min(400px,100%);background:var(--panel);border:1px solid var(--border2);border-radius:16px;padding:30px 26px 22px;text-align:center;box-shadow:0 18px 60px rgba(0,0,0,.55)}
+.lg-logo{width:52px;height:52px;border-radius:14px;background:var(--accent);color:#141414;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:24px;margin:0 auto 14px}
+.lg-card h1{font-size:20px;font-weight:700;letter-spacing:.2px}
+.lg-card h1 b{color:var(--accent)}
+.lg-sub{color:var(--muted);font-size:12.5px;margin-top:6px;line-height:1.6}
+.lg-label{display:block;text-align:left;font-size:10.5px;color:var(--dim);margin:20px 0 7px;letter-spacing:.6px;text-transform:uppercase}
+.lg-input{width:100%;background:#0b0e12;border:1px solid var(--border2);border-radius:10px;color:var(--text);font-family:var(--mono);font-size:13.5px;padding:13px 14px;outline:none;transition:border-color .15s}
+.lg-input:focus{border-color:var(--accent)}
+.lg-input.bad{border-color:var(--down);animation:wdShake .35s ease}
+.lg-err{display:none;color:var(--down);font-size:11.5px;margin-top:9px;text-align:left;line-height:1.55}
+.lg-err.warn{color:#f0b04c}
+.lg-btn{width:100%;margin-top:16px;padding:13px 20px;font-size:14px}
+.lg-note{font-size:10.5px;color:var(--dim);margin-top:12px;line-height:1.65}
+.lg-note a{color:var(--accent);text-decoration:none}
+.lg-badge{display:inline-flex;align-items:center;gap:6px;margin-top:14px;font-size:9.5px;color:var(--muted);border:1px solid var(--border);border-radius:20px;padding:4px 11px;letter-spacing:.5px}
+.lg-badge i{width:6px;height:6px;border-radius:50%;background:var(--dim)}
+
+/* ===== Floating Telegram contact (visible on every access page) ===== */
+.tg-contact{position:fixed;right:18px;bottom:18px;z-index:1001;display:none;align-items:center;gap:9px;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none}
+body.gate-on .tg-contact{display:flex}
+.tg-ic{position:relative;width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#2aa9e0,#1b8ac4);display:flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(0,0,0,.45),0 0 0 1px rgba(255,255,255,.08);transition:box-shadow .2s,transform .15s;flex-shrink:0}
+.tg-ic::after{content:'';position:absolute;inset:-5px;border-radius:50%;border:2px solid rgba(42,169,224,.6);animation:tgPulse 1.8s ease-out infinite}
+@keyframes tgPulse{0%{transform:scale(.8);opacity:1}70%{transform:scale(1.3);opacity:0}100%{transform:scale(1.3);opacity:0}}
+.tg-contact:hover .tg-ic{box-shadow:0 10px 30px rgba(34,158,217,.5),0 0 0 1px rgba(255,255,255,.14)}
+.tg-contact:active .tg-ic{transform:scale(.94)}
+.tg-ic svg{pointer-events:none}
+.tg-label{background:var(--panel2);border:1px solid var(--border2);color:var(--text);font-size:11.5px;font-weight:600;padding:7px 12px;border-radius:9px;box-shadow:0 6px 18px rgba(0,0,0,.4);white-space:nowrap}
+
+/* ===== "System is preparing..." unlock animation ===== */
+.lg-prepare{display:none;padding:8px 0 2px}
+.lg-prepare-t{font-size:15px;font-weight:700;margin-top:14px}
+.lg-prepare-s{font-size:11px;color:var(--muted);margin-top:4px}
+#loginGate.prep .lg-prepare{display:block}
+#loginGate.prep .lg-label,#loginGate.prep .lg-input,#loginGate.prep .lg-err,#loginGate.prep .lg-btn,#loginGate.prep .lg-alt,#loginGate.prep .lg-alt-hint,#loginGate.prep .lg-note{display:none}
+
+/* ===== Get Access Key (login page) ===== */
+.lg-alt{width:100%;margin-top:10px;padding:12px 20px;font-size:13.5px;background:linear-gradient(135deg,#2fd884,#20b26c 55%,#189a5a);border:1px solid rgba(32,178,108,.65);color:#06130c}
+.lg-alt:hover{background:linear-gradient(135deg,#3ce493,#27c177 55%,#1ca864);filter:none}
+.lg-alt-hint{font-size:10.5px;color:var(--dim);margin-top:7px;line-height:1.5}
+
+/* ===== Shared spinner / page transition loading ===== */
+.ld-spin{width:44px;height:44px;border-radius:50%;border:3px solid var(--border2);border-top-color:var(--accent);animation:wdSpin 1s linear infinite;margin:0 auto}
+.ld-gate{position:fixed;inset:0;z-index:1200;background:rgba(7,9,12,.93);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px}
+.ld-text{font-family:var(--mono);font-size:12.5px;color:var(--accent);letter-spacing:.4px}
+
+/* ===== Plans page ===== */
+.pl-gate,.py-gate{position:fixed;inset:0;z-index:1000;background:radial-gradient(900px 480px at 50% -8%,rgba(247,166,0,.07),transparent 60%),var(--bg);overflow-y:auto}
+.pl-wrap,.py-wrap{max-width:1060px;margin:0 auto;padding:26px 20px 60px}
+.pl-top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:30px}
+.pl-brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:16px}
+.pl-brand b{color:var(--accent)}
+.pl-title{font-size:24px;font-weight:700;text-align:center}
+.pl-sub{text-align:center;color:var(--muted);font-size:12.5px;margin-top:8px;line-height:1.65}
+.pl-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:30px}
+.pl-card{position:relative;background:var(--panel);border:1px solid var(--border2);border-radius:14px;padding:24px 18px 18px;display:flex;flex-direction:column;text-align:left}
+.pl-card.featured{border-color:rgba(247,166,0,.55);box-shadow:0 0 0 1px rgba(247,166,0,.22),0 14px 40px rgba(0,0,0,.35)}
+.pl-flag{position:absolute;top:-10px;left:50%;transform:translateX(-50%);background:var(--accent);color:#141414;font-size:9.5px;font-weight:800;letter-spacing:.6px;padding:3px 10px;border-radius:12px;white-space:nowrap}
+.pl-name{font-size:15px;font-weight:700}
+.pl-price{font-family:var(--mono);font-size:30px;font-weight:700;color:var(--accent);margin:10px 0 2px}
+.pl-price span{font-size:11px;color:var(--muted);font-weight:400}
+/* Sale pricing: struck-through original price + discount pill */
+.pl-price s,.py-price s{color:#848e9c;-webkit-text-fill-color:#848e9c;background:none;font-size:.58em;font-weight:500;margin-right:5px;text-decoration:line-through;text-decoration-color:rgba(132,142,156,.75);filter:none}
+.off-tag{display:inline-block;font-size:10px;font-weight:800;letter-spacing:.5px;color:#20b26c;-webkit-text-fill-color:#20b26c;background:rgba(32,178,108,.12);border:1px solid rgba(32,178,108,.45);border-radius:10px;padding:2px 8px;margin-left:7px;vertical-align:4px}
+.pl-feats{list-style:none;margin:12px 0 16px;flex:1}
+.pl-feats li{font-size:12px;color:var(--muted);padding:7px 0;border-top:1px solid var(--border);line-height:1.5}
+.pl-feats li::before{content:'\2713';color:var(--up);font-weight:700;margin-right:8px}
+.pl-pick{width:100%}
+.pl-note{text-align:center;color:var(--dim);font-size:11px;margin-top:24px;line-height:1.7}
+
+/* ===== Payment page ===== */
+.py-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:30px;text-align:left}
+.py-card{background:var(--panel);border:1px solid var(--border2);border-radius:14px;padding:18px 16px}
+.py-h{font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:12px}
+.py-plan{font-size:17px;font-weight:700}
+.py-price{font-family:var(--mono);font-size:26px;font-weight:700;color:var(--accent);margin:8px 0 8px}
+.py-price span{font-size:11px;color:var(--muted);font-weight:400}
+.py-det{display:flex;justify-content:space-between;gap:10px;font-size:11.5px;padding:8px 0;border-top:1px solid var(--border);color:var(--muted)}
+.py-det b{color:var(--text);font-weight:600;text-align:right}
+.py-amt-row{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--muted);background:var(--panel2);border:1px solid var(--border);border-radius:9px;padding:9px 12px;margin-bottom:10px}
+.py-amt-row b{font-family:var(--mono);color:var(--up);font-size:13px}
+.py-net{font-size:11.5px;color:var(--text);background:var(--panel2);border:1px solid var(--border);border-radius:9px;padding:9px 12px;line-height:1.6;margin-bottom:10px}
+.py-net b{color:var(--accent)}
+.py-net span{color:var(--dim);font-size:10.5px}
+.py-addr{font-family:var(--mono);font-size:11.5px;word-break:break-all;background:#0b0e12;border:1px solid var(--border2);border-radius:10px;padding:12px;cursor:pointer;transition:border-color .15s,background .15s;line-height:1.7;color:var(--text)}
+.py-addr:hover{border-color:var(--accent)}
+.py-addr.copied{border-color:var(--up);background:rgba(32,178,108,.08)}
+.py-copied{display:none;margin-top:8px;color:var(--up);font-size:11.5px;font-weight:700}
+.py-copied.show{display:block;animation:pop .55s ease}
+.py-hint{font-size:10px;color:var(--dim);margin-top:6px}
+.py-lbl{display:block;font-size:10.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px;margin:14px 0 6px}
+/* Promo code field (optional) on the checkout page - submitted with the Apply button */
+#pyPromo{text-transform:uppercase;letter-spacing:1px}
+.py-promo-row{display:flex;gap:8px;align-items:stretch}
+.py-promo-row .py-input{flex:1;min-width:0}
+.py-promo-btn{flex-shrink:0;border:none;border-radius:9px;background:var(--accent);color:#141414;font-weight:700;font-size:12px;letter-spacing:.4px;padding:0 16px;cursor:pointer;transition:filter .15s,transform .05s}
+.py-promo-btn:hover{filter:brightness(1.08)}
+.py-promo-btn:active{transform:translateY(1px)}
+.py-promo-msg{display:none;font-size:11px;margin-top:7px;line-height:1.5;text-align:left}
+.py-promo-msg.ok{display:block;color:var(--up)}
+.py-promo-msg.bad{display:block;color:#f0b04c}
+/* promo applied: price-drop animation + floating saving chip */
+.py-price{position:relative}
+.price-drop{animation:priceDrop .95s cubic-bezier(.2,.9,.3,1.18)}
+@keyframes priceDrop{0%{transform:scale(1)}30%{transform:scale(1.12);filter:drop-shadow(0 0 15px rgba(32,178,108,.55))}60%{transform:scale(.965)}100%{transform:scale(1);filter:drop-shadow(0 0 0 rgba(32,178,108,0))}}
+.promo-save-chip{position:absolute;top:-4px;right:0;font-family:var(--mono);font-size:11px;font-weight:800;color:#20b26c;background:rgba(32,178,108,.12);border:1px solid rgba(32,178,108,.45);border-radius:10px;padding:2px 8px;pointer-events:none;animation:savePop 1.2s ease forwards}
+@keyframes savePop{0%{opacity:0;transform:translateY(9px) scale(.7)}18%{opacity:1;transform:translateY(0) scale(1.08)}32%{transform:scale(1)}100%{opacity:0;transform:translateY(-22px) scale(1)}}
+.py-input{width:100%;background:#0b0e12;border:1px solid var(--border2);border-radius:9px;color:var(--text);font-family:var(--mono);font-size:12.5px;padding:11px 12px;outline:none;transition:border-color .15s}
+.py-input:focus{border-color:var(--accent)}
+.py-input.bad{border-color:var(--down);animation:wdShake .35s ease}
+.py-err{display:none;color:var(--down);font-size:10.5px;margin-top:6px;line-height:1.5}
+.py-file{display:block;text-align:center;border:1px dashed var(--border2);border-radius:10px;padding:13px 10px;color:var(--muted);font-size:12px;cursor:pointer;transition:border-color .15s,color .15s;line-height:1.5}
+.py-file:hover{border-color:var(--accent);color:var(--text)}
+.py-file small{display:block;color:var(--dim);font-size:10px;margin-top:3px}
+.py-fname{display:none;color:var(--up);font-size:11px;margin-top:7px;font-family:var(--mono);word-break:break-all}
+.py-submit{width:100%;margin-top:16px}
+.py-note{font-size:10px;color:var(--dim);margin-top:9px;line-height:1.6}
+.py-success{display:none;max-width:520px;margin:34px auto 0;background:var(--panel);border:1px solid rgba(32,178,108,.4);border-radius:16px;padding:36px 26px 26px;text-align:center}
+.py-success h2{font-size:19px;color:var(--up);margin-bottom:8px}
+.py-success p{color:var(--muted);font-size:12.5px;line-height:1.75}
+.py-success p b{color:var(--text)}
+.py-success .py-small{font-size:11px;color:var(--dim)}
+.py-check{width:64px;height:64px;display:block;margin:0 auto 14px}
+.py-check circle{stroke:var(--up);stroke-width:2.5;fill:none;stroke-dasharray:164;stroke-dashoffset:164;animation:wdDraw .7s ease forwards}
+.py-check path{stroke:var(--up);stroke-width:3.5;fill:none;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:40;stroke-dashoffset:40;animation:wdDraw .4s .55s ease forwards}
+#pyDone{margin-top:18px}
+
+@media(max-width:900px){
+  .pl-grid,.py-grid{grid-template-columns:1fr;max-width:440px;margin-left:auto;margin-right:auto}
+}
+@media(max-width:760px){
+  .lg-card{padding:24px 18px 18px}
+  .tg-ic{width:50px;height:50px}
+  .tg-contact{right:14px;bottom:14px}
+  .tg-label{display:none}
+  .pl-wrap,.py-wrap{padding:20px 14px 50px}
+  .pl-title{font-size:20px}
+}
+</style>
+
+<!-- V2 design refresh skin -->
+<style id="v2skin">
+/* ============================================================
+   V2 DESIGN REFRESH - modern high-visibility skin
+   Layered after the base theme: same tokens, richer surfaces,
+   glowing accents and clear emphasis on engaging elements.
+   ============================================================ */
+
+/* ---------- Foundation: ambient light + depth ---------- */
+html{
+  background:
+    radial-gradient(1100px 700px at 88% -12%, rgba(247,166,0,.10), transparent 55%),
+    radial-gradient(900px 620px at -12% 112%, rgba(97,175,239,.07), transparent 55%),
+    #07090d;
+  background-attachment:fixed;
+}
+body{background:transparent}
+
+/* ---------- Top bar: frosted glass + glowing brand ---------- */
+.topbar{background:rgba(10,13,17,.82);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-bottom:1px solid rgba(247,166,0,.16);box-shadow:0 8px 30px rgba(0,0,0,.35)}
+.logo-mark{background:linear-gradient(135deg,#ffcf5c,#f7a600);box-shadow:0 0 18px rgba(247,166,0,.5)}
+.logo b{color:#f7a600;background:linear-gradient(90deg,#ffd98a,#f7a600);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.nav a{padding:8px 14px;border-radius:9px;transition:color .15s,background .15s}
+.nav a:hover{color:var(--text);background:rgba(255,255,255,.05)}
+.nav a.active{color:#ffd27a;background:rgba(247,166,0,.10);font-weight:600}
+.nav a.active::after{display:none}
+.avatar{box-shadow:0 0 0 1px rgba(247,166,0,.35),0 0 14px rgba(247,166,0,.15)}
+
+/* ---------- Simulation notice: sleek glowing pill ---------- */
+.notice{border:1px solid rgba(247,166,0,.42);background:linear-gradient(90deg,rgba(247,166,0,.13),rgba(247,166,0,.03));border-radius:12px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.notice .tag{border-radius:6px;box-shadow:0 0 14px rgba(247,166,0,.45)}
+
+/* ---------- Panels: glass surfaces + hover lift ---------- */
+.panel{background:linear-gradient(180deg,rgba(28,34,44,.72),rgba(16,20,26,.94));border:1px solid rgba(128,144,166,.17);border-radius:16px;box-shadow:0 12px 34px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.04)}
+.hunter-panel{padding:20px 20px 16px}
+.panel-head h1{font-size:22px;letter-spacing:.2px}
+.panel-head h1 svg{filter:drop-shadow(0 0 9px rgba(247,166,0,.65))}
+.panel-head .sub{color:#93a0b0}
+
+/* ---------- Buttons: premium gradient CTA + shine sweep ---------- */
+.btn{position:relative;overflow:hidden;border-radius:11px}
+.btn-primary{background:linear-gradient(135deg,#ffbe33,#f7a600 55%,#e18f00);color:#171006;box-shadow:0 4px 18px rgba(247,166,0,.35),inset 0 1px 0 rgba(255,255,255,.35);transition:filter .15s,transform .12s,box-shadow .25s}
+.btn-primary:hover{filter:brightness(1.07);transform:translateY(-1px);box-shadow:0 7px 26px rgba(247,166,0,.5),inset 0 1px 0 rgba(255,255,255,.35)}
+.btn-primary::after{content:'';position:absolute;top:0;left:-80%;width:45%;height:100%;background:linear-gradient(105deg,transparent,rgba(255,255,255,.5),transparent);transform:skewX(-20deg);animation:btnShine 3.6s ease-in-out infinite}
+@keyframes btnShine{0%,55%{left:-80%}80%,100%{left:140%}}
+.btn-ghost{color:#a7b2c1;border-color:rgba(132,142,156,.35);background:rgba(255,255,255,.02);transition:color .15s,border-color .2s,box-shadow .2s,background .2s}
+.btn-ghost:hover{color:#fff;border-color:rgba(247,166,0,.55);background:rgba(247,166,0,.07);box-shadow:0 0 16px rgba(247,166,0,.14)}
+button:focus-visible,a:focus-visible{outline:2px solid rgba(247,166,0,.65);outline-offset:2px}
+
+/* ---------- Primary control (Start/Pause): breathing glow ---------- */
+#mainBtn{font-size:14.5px;padding:12px 30px;animation:ctaBreath 3.4s ease-in-out infinite}
+#mainBtn::after{display:none}
+@keyframes ctaBreath{0%,100%{box-shadow:0 4px 18px rgba(247,166,0,.30),0 0 0 0 rgba(247,166,0,.30)}50%{box-shadow:0 6px 28px rgba(247,166,0,.55),0 0 0 10px rgba(247,166,0,0)}}
+
+/* ---------- Stat cards: lifted glass + glowing figures ---------- */
+.stats{gap:10px}
+.stat{background:linear-gradient(180deg,rgba(33,40,52,.85),rgba(19,24,31,.92));border:1px solid rgba(128,144,166,.17);border-radius:12px;overflow:hidden;transition:transform .15s,border-color .2s,box-shadow .25s}
+.stat:hover{transform:translateY(-1px);border-color:rgba(247,166,0,.38);box-shadow:0 6px 22px rgba(0,0,0,.35)}
+.stat .lbl{display:flex;align-items:center;gap:5px;color:#8994a3;font-weight:600}
+.lbl-ic{width:11px;height:11px;flex-shrink:0}
+.stat .val{font-size:clamp(14px,3.2vw,18px)}
+.stat .val.accent{color:var(--accent);background:linear-gradient(90deg,#ffd98a,#f7a600);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 0 9px rgba(247,166,0,.35))}
+.badge{border-radius:16px}
+.badge .dot{box-shadow:0 0 8px currentColor}
+.badge.running{background:rgba(32,178,108,.08);border-color:rgba(32,178,108,.5);box-shadow:0 0 16px rgba(32,178,108,.22);text-shadow:0 0 10px rgba(32,178,108,.45)}
+.badge.paused{background:rgba(247,166,0,.08);border-color:rgba(247,166,0,.5);box-shadow:0 0 16px rgba(247,166,0,.18)}
+.pick{border-radius:8px;padding:4px 8px;font-size:10px;transition:border-color .15s,background .15s,color .15s,box-shadow .2s}
+.pick.on{font-weight:800}
+
+/* ---------- Console: deep terminal + highlighted matches ---------- */
+.console{background:linear-gradient(180deg,#05070a,#090c11);border:1px solid rgba(128,144,166,.15);border-radius:14px;box-shadow:inset 0 0 46px rgba(0,0,0,.6)}
+.line.sys{color:#ffc353}
+.line.match{background:linear-gradient(90deg,rgba(32,178,108,.17),rgba(32,178,108,.03));box-shadow:inset 2px 0 0 var(--up)}
+.line.match .k{color:#8cebbf}
+
+/* ---------- Sidebar: staggered entrance + glowing section heads ---------- */
+.side-panel{padding:17px}
+.side-head h2{display:flex;align-items:center;gap:8px;font-size:15.5px;letter-spacing:.2px}
+.side-head h2 svg{flex-shrink:0}
+.hunter-panel,.side-panel:not(#foundPanel){animation:panelIn .5s ease both}
+.side-panel:not(#foundPanel){animation-delay:.07s}
+@keyframes panelIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+
+/* ---------- Treasure bar: total value + Withdraw CTA ---------- */
+.wd-bar{background:linear-gradient(90deg,rgba(247,166,0,.15),rgba(32,178,108,.07) 55%,rgba(255,255,255,.02));border:1px solid rgba(247,166,0,.42);border-radius:12px;padding:10px 12px;box-shadow:0 0 26px rgba(247,166,0,.12),inset 0 1px 0 rgba(255,255,255,.05)}
+.wd-amt{font-size:17px;color:var(--up);background:linear-gradient(90deg,#8cebbf,#20b26c);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 0 9px rgba(32,178,108,.35))}
+.wd-count{color:#ffd27a}
+.wd-btn{background:linear-gradient(135deg,#ffbe33,#f7a600);border-radius:9px;font-size:11.5px;padding:8px 14px;transition:filter .15s,transform .05s,box-shadow .25s}
+.wd-btn:not(:disabled){animation:wdPulse 2.4s ease-in-out infinite}
+@keyframes wdPulse{0%,100%{box-shadow:0 3px 14px rgba(247,166,0,.35)}50%{box-shadow:0 3px 24px rgba(247,166,0,.65)}}
+
+/* ---------- Found wallets: celebratory glowing cards ---------- */
+.found-item{position:relative;background:linear-gradient(180deg,rgba(32,178,108,.11),rgba(22,28,36,.92) 46%);border:1px solid rgba(32,178,108,.38);border-radius:12px;animation:foundPop .45s cubic-bezier(.2,.9,.3,1.15);transition:transform .15s,border-color .2s,box-shadow .25s}
+.found-item::before{content:'';position:absolute;left:-1px;top:12%;bottom:12%;width:3px;border-radius:3px;background:linear-gradient(180deg,#8cebbf,#20b26c);box-shadow:0 0 10px rgba(32,178,108,.65)}
+.found-item:hover{transform:translateY(-1px);border-color:rgba(32,178,108,.62);box-shadow:0 8px 24px rgba(32,178,108,.16)}
+@keyframes foundPop{0%{opacity:0;transform:translateY(-10px) scale(.96)}55%{box-shadow:0 0 0 5px rgba(32,178,108,.22)}100%{opacity:1;transform:none;box-shadow:0 0 0 0 rgba(32,178,108,0)}}
+.fi-bal{color:#8cebbf;font-size:12.5px;text-shadow:0 0 12px rgba(32,178,108,.4)}
+.fi-copy{border-radius:8px;transition:color .15s,border-color .15s,box-shadow .2s}
+.fi-copy:hover{box-shadow:0 0 12px rgba(247,166,0,.28)}
+.chain-tag{border-radius:6px;box-shadow:0 3px 10px rgba(0,0,0,.35)}
+.empty{border-color:rgba(128,144,166,.3)}
+
+/* ---------- Live prices: pulsing feed badge + vivid flashes ---------- */
+.src{border-radius:12px}
+.src::before{content:'';width:6px;height:6px;border-radius:50%;background:currentColor;box-shadow:0 0 8px currentColor;animation:pulse 1.4s infinite}
+.src.live{background:rgba(32,178,108,.14);box-shadow:0 0 14px rgba(32,178,108,.22)}
+.src.sim{background:rgba(247,166,0,.12);box-shadow:0 0 14px rgba(247,166,0,.18)}
+.cicon{box-shadow:0 3px 12px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.28)}
+.cprice{transition:color .4s,text-shadow .4s}
+.cprice.up{color:#2fd884;text-shadow:0 0 14px rgba(32,178,108,.5)}
+.cprice.down{color:#ff6b6e;text-shadow:0 0 14px rgba(239,69,74,.45)}
+
+/* ---------- Withdraw modal + toast: premium depth ---------- */
+.wd-overlay{backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.wd-modal{background:linear-gradient(180deg,rgba(27,33,43,.97),rgba(14,18,24,.99));border:1px solid rgba(247,166,0,.28);border-radius:18px;box-shadow:0 26px 70px rgba(0,0,0,.6),0 0 50px rgba(247,166,0,.08)}
+.wd-ic{box-shadow:0 0 26px rgba(247,166,0,.3)}
+.wd-toast{background:linear-gradient(180deg,rgba(26,34,30,.96),rgba(15,20,17,.98));box-shadow:0 14px 40px rgba(0,0,0,.5),0 0 30px rgba(32,178,108,.16)}
+
+/* ---------- Login gate: glowing hero card ---------- */
+.lg-gate{background:radial-gradient(900px 500px at 50% -10%,rgba(247,166,0,.13),transparent 60%),radial-gradient(760px 520px at 82% 112%,rgba(97,175,239,.06),transparent 60%),#07090d}
+.lg-card{position:relative;overflow:hidden;background:linear-gradient(180deg,rgba(27,33,43,.92),rgba(14,18,24,.97));border:1px solid rgba(247,166,0,.26);border-radius:20px;box-shadow:0 26px 80px rgba(0,0,0,.6),0 0 60px rgba(247,166,0,.07),inset 0 1px 0 rgba(255,255,255,.05)}
+.lg-card::before{content:'';position:absolute;top:0;left:12%;right:12%;height:1px;background:linear-gradient(90deg,transparent,rgba(247,166,0,.85),transparent)}
+.lg-logo{background:linear-gradient(135deg,#ffcf5c,#f7a600);border-radius:15px;animation:logoGlow 2.6s ease-in-out infinite}
+@keyframes logoGlow{0%,100%{box-shadow:0 0 24px rgba(247,166,0,.45)}50%{box-shadow:0 0 46px rgba(247,166,0,.8)}}
+.lg-input{background:rgba(7,9,12,.8);border-radius:11px}
+.lg-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(247,166,0,.16),0 0 22px rgba(247,166,0,.14)}
+.lg-btn{border-radius:12px;font-size:14.5px}
+.lg-alt{background:linear-gradient(135deg,#3fe08f,#20b26c 55%,#169558);border:1px solid rgba(140,235,191,.5);border-radius:12px;font-weight:700;color:#06130c;box-shadow:0 4px 18px rgba(32,178,108,.35),inset 0 1px 0 rgba(255,255,255,.3);transition:filter .15s,transform .12s,box-shadow .25s;animation:lgAltBreath 3s ease-in-out infinite}
+.lg-alt::after{content:'';position:absolute;top:0;left:-80%;width:45%;height:100%;background:linear-gradient(105deg,transparent,rgba(255,255,255,.5),transparent);transform:skewX(-20deg);animation:btnShine 3.6s ease-in-out infinite}
+.lg-alt:hover{background:linear-gradient(135deg,#4ce79b,#27c177 55%,#1aa963);box-shadow:0 7px 28px rgba(32,178,108,.5),0 0 42px rgba(32,178,108,.3),inset 0 1px 0 rgba(255,255,255,.3);transform:translateY(-1px);filter:brightness(1.05)}
+@keyframes lgAltBreath{0%,100%{box-shadow:0 4px 18px rgba(32,178,108,.35),0 0 0 0 rgba(32,178,108,.35)}50%{box-shadow:0 6px 26px rgba(32,178,108,.55),0 0 0 10px rgba(32,178,108,0)}}
+.lg-badge{background:rgba(255,255,255,.03);border-radius:14px}
+
+/* ---------- Plans page: featured cards that pop ---------- */
+.pl-card{background:linear-gradient(180deg,rgba(27,33,43,.85),rgba(14,18,24,.95));border-radius:18px;transition:transform .18s,box-shadow .25s,border-color .2s}
+.pl-card:hover{transform:translateY(-4px);box-shadow:0 20px 46px rgba(0,0,0,.45)}
+.pl-card.featured{border-color:rgba(247,166,0,.62);box-shadow:0 0 0 1px rgba(247,166,0,.26),0 16px 44px rgba(0,0,0,.4),0 0 44px rgba(247,166,0,.13)}
+.pl-card.featured::after{content:'';position:absolute;top:0;left:15%;right:15%;height:2px;border-radius:2px;background:linear-gradient(90deg,transparent,#f7a600,transparent);box-shadow:0 0 16px rgba(247,166,0,.85);animation:featBar 2.8s ease-in-out infinite}
+@keyframes featBar{0%,100%{opacity:.5}50%{opacity:1}}
+.pl-flag{border-radius:14px;box-shadow:0 0 18px rgba(247,166,0,.55)}
+.pl-price{color:var(--accent);background:linear-gradient(90deg,#ffd98a,#f7a600);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 0 12px rgba(247,166,0,.3))}
+.pl-price span{background:none;-webkit-background-clip:initial;background-clip:initial;-webkit-text-fill-color:initial;color:var(--muted);filter:none}
+.pl-feats li::before{text-shadow:0 0 8px rgba(32,178,108,.6)}
+.pl-pick{transition:transform .12s,box-shadow .25s,filter .15s}
+.pl-pick:hover{transform:translateY(-1px)}
+
+/* ---------- Payment page: clear affordances ---------- */
+.py-card{background:linear-gradient(180deg,rgba(27,33,43,.85),rgba(14,18,24,.95));border-radius:16px}
+.py-addr{position:relative;padding-right:42px;background:rgba(7,9,12,.85);border-radius:12px;line-height:1.8;transition:border-color .2s,box-shadow .25s,background .2s}
+.py-addr:hover{border-color:var(--accent);box-shadow:0 0 22px rgba(247,166,0,.16)}
+.py-addr.copied{border-color:var(--up);background:rgba(32,178,108,.08);box-shadow:0 0 26px rgba(32,178,108,.28)}
+.py-copyic{position:absolute;right:12px;top:14px;color:var(--muted);transition:color .2s}
+.py-addr.copied .py-copyic{color:var(--up)}
+.py-amt-row b{color:#2fd884;text-shadow:0 0 10px rgba(32,178,108,.35)}
+.py-promo-btn{background:linear-gradient(135deg,#ffbe33,#f7a600);box-shadow:0 3px 14px rgba(247,166,0,.28),inset 0 1px 0 rgba(255,255,255,.3);transition:filter .15s,transform .12s,box-shadow .25s}
+.py-promo-btn:hover{filter:brightness(1.07);box-shadow:0 5px 22px rgba(247,166,0,.45),inset 0 1px 0 rgba(255,255,255,.3)}
+.py-file:hover{border-color:var(--accent);box-shadow:0 0 18px rgba(247,166,0,.12)}
+
+/* ---------- Loading overlay + Telegram button ---------- */
+.ld-gate{background:rgba(5,7,10,.94);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.ld-spin{box-shadow:0 0 26px rgba(247,166,0,.22)}
+.tg-ic{background:linear-gradient(135deg,#41bdf2,#1b8ac4);box-shadow:0 10px 30px rgba(27,138,196,.5),0 0 0 1px rgba(255,255,255,.12)}
+.tg-label{background:rgba(19,25,33,.94);border-color:rgba(42,169,224,.45);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+
+/* ---------- Scrollbars ---------- */
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#2b3442;border-radius:8px;border:2px solid #0b0e11}
+::-webkit-scrollbar-thumb:hover{background:#3b4a5f}
+
+/* ---------- Offline gate: app closed without internet ---------- */
+.off-gate{position:fixed;inset:0;z-index:4000;display:flex;align-items:center;justify-content:center;padding:20px;background:radial-gradient(760px 480px at 50% -8%,rgba(239,69,74,.10),transparent 60%),rgba(5,7,10,.985);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+.off-card{width:min(432px,100%);background:linear-gradient(180deg,rgba(27,33,43,.92),rgba(13,17,23,.97));border:1px solid rgba(239,69,74,.38);border-radius:20px;padding:38px 30px 26px;text-align:center;box-shadow:0 26px 80px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.05);animation:offIn .4s cubic-bezier(.2,.9,.3,1.2)}
+@keyframes offIn{from{opacity:0;transform:translateY(18px) scale(.96)}to{opacity:1;transform:none}}
+.off-ic{width:78px;height:78px;margin:0 auto 18px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#ff8f92;background:rgba(239,69,74,.12);border:1px solid rgba(239,69,74,.42);animation:offPulse 1.8s ease-in-out infinite}
+@keyframes offPulse{0%,100%{box-shadow:0 0 0 0 rgba(239,69,74,.35)}50%{box-shadow:0 0 0 15px rgba(239,69,74,0)}}
+.off-card h1{font-size:22px;font-weight:700;letter-spacing:.2px}
+.off-msg{color:var(--muted);font-size:13px;margin-top:8px;line-height:1.7}
+.off-state{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:18px;font-family:var(--mono);font-size:11.5px;color:#ffb3b5;background:rgba(239,69,74,.08);border:1px solid rgba(239,69,74,.28);border-radius:10px;padding:9px 12px}
+.off-dot{width:7px;height:7px;border-radius:50%;background:#ff8f92;box-shadow:0 0 8px #ff8f92;animation:pulse 1.1s infinite;flex-shrink:0}
+.off-retry{width:100%;margin-top:16px;border-radius:12px}
+.off-note{font-size:10.5px;color:var(--dim);margin-top:12px;line-height:1.65}
+body.app-offline .tg-contact{display:none!important}
+
+/* ---------- Reduced motion + small screens ---------- */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+}
+@media(max-width:760px){
+  .off-card{padding:28px 20px 20px}
+  .off-ic{width:64px;height:64px}
+}
+</style>
+</head>
+<body class="gate-on">
+
+<!-- ================= Offline gate: app closed without internet ================= -->
+<div class="off-gate" id="offlineGate" style="display:none" role="alertdialog" aria-modal="true" aria-label="You are offline">
+  <div class="off-card">
+    <div class="off-ic">
+      <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h.01"/><path d="M8.5 16.4a5 5 0 0 1 7 0"/><path d="M5 12.86a10 10 0 0 1 5.17-2.69"/><path d="M19 12.86a10 10 0 0 0-2.007-1.523"/><path d="M2 8.82a15 15 0 0 1 4.177-2.643"/><path d="M22 8.82a15 15 0 0 0-11.288-3.764"/><path d="m2 2 20 20"/></svg>
+    </div>
+    <h1>You&rsquo;re Offline</h1>
+    <p class="off-msg">Wallet Hunter only works with an internet connection.<br>Please go online to continue.</p>
+    <div class="off-state"><span class="off-dot"></span><span id="offStateText">Waiting for connection&hellip;</span></div>
+    <button class="btn btn-primary off-retry" id="offRetry">Retry Now</button>
+    <div class="off-note">Check your Wi-Fi or mobile data and tap Retry &mdash; the console reopens automatically as soon as you are back online.</div>
+  </div>
+</div>
+
+<!-- ================= Access gate (key login) ================= -->
+<div class="lg-gate" id="loginGate">
+  <div class="lg-card">
+    <div class="lg-logo">W</div>
+    <h1>Wallet<b>Hunter</b></h1>
+    <div class="lg-sub">Restricted access &mdash; enter your access key to reach the hunter console.</div>
+    <label class="lg-label" for="lgKey">Access Key</label>
+    <input class="lg-input" id="lgKey" type="text" placeholder="Paste your access key" spellcheck="false" autocomplete="off" autocapitalize="off" maxlength="128">
+    <div class="lg-err" id="lgErr"></div>
+    <div class="lg-prepare" id="lgPrepare">
+      <div class="ld-spin"></div>
+      <div class="lg-prepare-t">System is preparing&hellip;</div>
+      <div class="lg-prepare-s">Verifying your key and unlocking the console</div>
+    </div>
+    <button class="btn btn-primary lg-btn" id="lgBtn">Unlock Console</button>
+    <button class="btn lg-alt" id="lgPlansBtn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:7px"><path d="M2 18v3c0 .6.4 1 1 1h4v-3h3v-3h2l1.4-1.4a6.5 6.5 0 1 0-4-4Z"/><circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/></svg>Get Access Key &mdash; from <span id="lgFrom">$0.99</span></button>
+    <div class="lg-alt-hint">No key yet? Buy an access plan &mdash; pay with USDT (BEP-20), key delivered by email.</div>
+    <div class="lg-note">REFUND GUARANTEE: We offer a refund process within 7 days after the period ends. Please note that this is strictly available for users whose wallets have not been funded.<br>Need a key? Message us on Telegram &mdash; <a href="https://t.me/Wallet_Hunter_Support" target="_blank" rel="noopener"><b>@Wallet_Hunter_Support</b></a></div>
+    <div class="lg-badge"><i></i><span id="lgState">AWAITING KEY</span></div>
+  </div>
+</div>
+
+<!-- ================= Floating Telegram contact (all access pages) ================= -->
+<div class="tg-contact" id="tgContact" title="Contact us on Telegram &mdash; @Wallet_Hunter_Support">
+  <span class="tg-label">Contact us &mdash; @Wallet_Hunter_Support</span>
+  <span class="tg-ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg></span>
+</div>
+
+<!-- ================= Plans page ================= -->
+<div class="pl-gate" id="plansPage" style="display:none">
+  <div class="pl-wrap">
+    <div class="pl-top">
+      <button class="btn btn-ghost pl-back" id="plansBack">&larr; Back</button>
+      <div class="pl-brand"><span class="logo-mark">W</span>Wallet<b>Hunter</b></div>
+    </div>
+    <h1 class="pl-title">Choose Your Access Plan</h1>
+    <p class="pl-sub">Pick a plan, pay with USDT (BEP-20), and your access key is delivered to your email within one hour.</p>
+    <div class="pl-grid" id="plGrid">
+      <!-- Plan cards are rendered by buildOffers() from the OFFERS list in the script -->
+    </div>
+    <div class="pl-note">Payments are made in USDT on the BNB Smart Chain (BEP-20).<br>After paying, submit your email and payment screenshot on the next page &mdash; your key arrives by email within one hour.</div>
+  </div>
+</div>
+
+<!-- ================= Payment page ================= -->
+<div class="py-gate" id="payPage" style="display:none">
+  <div class="py-wrap">
+    <div class="pl-top">
+      <button class="btn btn-ghost pl-back" id="payBack">&larr; Plans</button>
+      <div class="pl-brand"><span class="logo-mark">W</span>Wallet<b>Hunter</b></div>
+    </div>
+    <h1 class="pl-title" id="payTitle">Complete Your Payment</h1>
+    <p class="pl-sub">Send the exact amount in USDT (BEP-20) to the address below, then submit your details so we can deliver your key.</p>
+    <div class="py-grid">
+      <div class="py-card">
+        <div class="py-h">Order Summary</div>
+        <div class="py-plan" id="pyPlanName">&mdash;</div>
+        <div class="py-price" id="pyPlanPrice">&mdash;</div>
+        <div class="py-det"><span>Duration</span><b id="pyPlanDur">&mdash;</b></div>
+        <div class="py-det"><span>Delivery</span><b>Access key by email</b></div>
+        <div class="py-det"><span>Delivery time</span><b>Within 1 hour of payment</b></div>
+        <div class="py-det"><span>Support</span><b>Telegram &mdash; @Wallet_Hunter_Support</b></div>
+      </div>
+      <div class="py-card">
+        <div class="py-h">Payment Details</div>
+        <label class="py-lbl" for="pyPromo">Promo code (optional)</label>
+        <div class="py-promo-row">
+          <input class="py-input" id="pyPromo" type="text" placeholder="Enter promo code" spellcheck="false" autocomplete="off" autocapitalize="characters" maxlength="16">
+          <button class="py-promo-btn" id="pyPromoBtn" type="button">Apply</button>
+        </div>
+        <div class="py-promo-msg" id="pyPromoMsg"></div>
+        <div class="py-amt-row"><span>Send exact amount</span><b id="pyAmt">&mdash;</b></div>
+        <div class="py-net">Network: <b>BNB Smart Chain (BEP-20)</b><br><span>Send only USDT on BEP-20 to this address &mdash; other tokens or networks cannot be recovered. Funds go to our campus organization.</span></div>
+        <div class="py-addr" id="pyAddr" title="Click to copy the wallet address">0x4e8fE4Cd73f906Ec351f919baB8e2A53c1a2387C<span class="py-copyic"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2.5"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></span></div>
+        <div class="py-copied" id="pyCopied">&#10003; Copied to clipboard</div>
+        <div class="py-hint">Tap the address to copy it</div>
+      </div>
+      <div class="py-card">
+        <div class="py-h">Your Details</div>
+        <label class="py-lbl" for="pyEmail">Email address for key delivery</label>
+        <input class="py-input" id="pyEmail" type="email" placeholder="you@example.com" spellcheck="false" autocomplete="email" maxlength="120">
+        <div class="py-err" id="pyEmailErr">Enter a valid email address &mdash; your access key will be sent there.</div>
+        <label class="py-lbl" for="pyFile">Proof of payment</label>
+        <label class="py-file" for="pyFile">Upload payment screenshot<small>PNG or JPG of your USDT transfer confirmation</small></label>
+        <input type="file" id="pyFile" accept="image/*" style="display:none">
+        <div class="py-fname" id="pyFname"></div>
+        <div class="py-err" id="pyFileErr">Please attach a screenshot of your payment as proof.</div>
+        <button class="btn btn-primary py-submit" id="pySubmit">Submit Order</button>
+        <div class="py-note">Your order is sent to our team instantly. Keep the screenshot until your key arrives &mdash; usually within one hour.</div>
+      </div>
+    </div>
+    <div class="py-success" id="pySuccess">
+      <svg class="py-check" viewBox="0 0 64 64"><circle cx="32" cy="32" r="26"/><path d="M21 33l8 8 15-17"/></svg>
+      <h2>Order Submitted Successfully</h2>
+      <p>Your access key will be sent to <b id="pySuccEmail"></b> within one hour after your payment is confirmed.</p>
+      <p class="py-small">Keep your payment screenshot until the key arrives.<br>Questions? Tap the Telegram button below &mdash; we usually reply within minutes.</p>
+      <button class="btn btn-ghost" id="pyDone">Back to Login</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= Page transition loading ================= -->
+<div class="ld-gate" id="pageLoading" style="display:none">
+  <div class="ld-spin"></div>
+  <div class="ld-text" id="ldText">Preparing your order&hellip;</div>
+</div>
+
+<header class="topbar">
+  <div class="logo"><span class="logo-mark">W</span><span>Wallet<b>Hunter</b></span></div>
+  <nav class="nav">
+    <a href="#">Markets</a>
+    <a href="#" class="active">Wallet Hunter</a>
+    <a href="#">Derivatives</a>
+    <a href="#">Assets</a>
+    <a href="#">Earn</a>
+  </nav>
+  <div class="top-right">
+    <div class="acct-chip"><span class="lbl">DEMO BALANCE (USD)</span><span class="val">$12,480.55</span></div>
+  </div>
+</header>
+
+<main class="layout">
+  <section class="panel hunter-panel">
+    <div class="panel-head">
+      <div>
+        </h1>
+        <div class="sub"></div>
+      </div>
+    </div>
+
+    <div class="stats">
+      <div class="stat">
+        <div class="lbl"><svg class="lbl-ic" viewBox="0 0 24 24" fill="none" stroke="#f7a600" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 18v3c0 .6.4 1 1 1h4v-3h3v-3h2l1.4-1.4a6.5 6.5 0 1 0-4-4Z"/><circle cx="16.5" cy="7.5" r=".5" fill="#f7a600"/></svg>Keys Checked</div>
+        <div class="val" id="keysChecked" contenteditable="true" spellcheck="false" inputmode="numeric" title="Click to edit the count">0</div>
+        <span class="badge" id="statusBadge" title="Scanner status"><span class="dot"></span><span id="statusText">IDLE</span></span>
+      </div>
+      <div class="stat">
+        <div class="lbl"><svg class="lbl-ic" viewBox="0 0 24 24" fill="none" stroke="#61afef" stroke-width="2.4" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>Scan Rate</div>
+        <div class="val" id="scanRate">0<span class="unit">keys/s</span></div>
+        <div class="scan-coins" id="scanCoins"></div>
+      </div>
+      <div class="stat"><div class="lbl"><svg class="lbl-ic" viewBox="0 0 24 24" fill="none" stroke="#20b26c" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12l4 6-10 13L2 9Z"/><path d="M11 3 8 9l4 13 4-13-3-6"/><path d="M2 9h20"/></svg>Wallets Found</div><div class="val accent" id="foundStat">0</div></div>
+      <div class="stat">
+        <div class="lbl"><svg class="lbl-ic" viewBox="0 0 24 24" fill="none" stroke="#b48ef7" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2" fill="#b48ef7" stroke="none"/></svg>Target Coins</div>
+        <div class="coin-picks" id="coinPicks"></div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button class="btn btn-primary" id="mainBtn">Start Search</button>
+      <button class="btn btn-ghost" id="resetBtn">Reset</button>
+    </div>
+
+    <div class="console" id="console">
+      <div class="line sys">[system] Press "Start Search" to begin generating synthetic keys.</div>
+    </div>
+  </section>
+
+  <aside class="sidebar">
+    <section class="panel side-panel" id="foundPanel">
+      <div class="side-head"><h2><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#f7a600" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" style="filter:drop-shadow(0 0 5px rgba(247,166,0,.55))"><path d="M6 3h12l4 6-10 13L2 9Z"/><path d="M11 3 8 9l4 13 4-13-3-6"/><path d="M2 9h20"/></svg>Wallets Found</h2></div>
+      <div class="wd-bar">
+        <div class="wd-info" title="Total USDT value of found wallets">
+          <span class="wd-lbl">Total</span>
+          <span class="wd-amt" id="wdTotal">0.00</span>
+          <span class="wd-unit">USDT</span>
+          <span class="wd-div"></span>
+          <span class="wd-lbl" title="Wallets matched this session">Found</span>
+          <span class="wd-count" id="foundCount">0</span>
+        </div>
+        <button class="wd-btn" id="wdBtn" disabled title="Find at least one wallet first">Withdraw</button>
+      </div>
+      <div class="tgt-row" style="display:none">
+        <span class="wd-lbl">Target</span>
+        <input class="tgt-input" id="tgtInput" type="number" min="0" step="any" placeholder="Set target amount (USD)" title="Set a USD target — progress updates as wallets are found">
+        <span class="tgt-stat" id="tgtStat"></span>
+      </div>
+      <div class="found-list" id="foundList">
+        <div class="empty">No wallets found yet.<br>Start the search — matches appear here.</div>
+      </div>
+    </section>
+
+    <section class="panel side-panel">
+      <div class="side-head">
+        <h2><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#20b26c" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" style="filter:drop-shadow(0 0 5px rgba(32,178,108,.55))"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Live Prices</h2>
+        <span class="src sim" id="srcBadge"><span id="srcText">CONNECTING</span></span>
+      </div>
+      <div id="priceList"></div>
+    </section>
+  </aside>
+</main>
+
+<div class="wd-overlay" id="wdOverlay">
+  <div class="wd-modal" role="dialog" aria-modal="true" aria-label="Withdraw">
+    <button class="wd-x" id="wdClose" title="Close">
+      <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 2l8 8M10 2l-8 8"/></svg>
+    </button>
+
+    <div id="wdStepForm">
+      <div class="wd-ic">
+        <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#f7a600" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M19 7V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2H5"/><circle cx="16" cy="13.5" r="1.1" fill="#f7a600" stroke="none"/></svg>
+      </div>
+      <h3>Withdraw Funds</h3>
+      <div class="wd-sub">Send the combined value of this session's found wallets to your own wallet.</div>
+      <div class="wd-row"><span>Amount to withdraw</span><b id="wdAvail">0.00 USDT</b></div>
+      <label class="wd-lbl2" for="wdInput">Your USDT BEP-20 wallet address</label>
+      <input class="wd-input" id="wdInput" type="text" placeholder="0x &hellip;" spellcheck="false" autocomplete="off" maxlength="42">
+      <div class="wd-err" id="wdErr">That doesn't look like a BEP-20 address &mdash; it must start with 0x followed by 40 hexadecimal characters.</div>
+      <button class="btn btn-primary wd-confirm" id="wdConfirm">Initiate Withdrawal</button>
+      <div class="wd-note">Simulation only &mdash; nothing is broadcast on-chain and the address you type never leaves this page.</div>
+    </div>
+
+    <div id="wdStepProc" style="display:none">
+      <div class="wd-spin"></div>
+      <h3>Processing Withdrawal</h3>
+      <div class="wd-prog"><i id="wdProgFill"></i></div>
+      <div class="wd-proc-step" id="wdProcStep">Connecting to BNB Chain&hellip;</div>
+      <div class="wd-dets">
+        <div class="wd-det"><span>Amount</span><b id="wdAmt">0.00 USDT</b></div>
+        <div class="wd-det"><span>Network</span><b>BNB Smart Chain (BEP-20)</b></div>
+        <div class="wd-det"><span>To</span><b id="wdAddr"></b></div>
+      </div>
+    </div>
+
+    <div id="wdStepDone" style="display:none">
+      <svg class="wd-check" viewBox="0 0 64 64"><circle cx="32" cy="32" r="26"/><path d="M21 33l8 8 15-17"/></svg>
+      <h3 class="ok">Withdrawal Successful</h3>
+      <div class="wd-sub">The simulated funds were sent to your wallet.</div>
+      <div class="wd-dets">
+        <div class="wd-det"><span>Amount</span><b id="wdAmtDone">0.00 USDT</b></div>
+        <div class="wd-det"><span>To</span><b id="wdAddrDone"></b></div>
+        <div class="wd-det"><span>TxID</span><b id="wdTx"></b></div>
+      </div>
+      <button class="btn btn-primary wd-done-btn" id="wdDone">Done</button>
+      <div class="wd-note">Simulation only &mdash; no real funds were moved.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* ================= Utilities ================= */
+const $ = id => document.getElementById(id);
+const fmtInt = n => Math.floor(n).toLocaleString('en-US');
+const B58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+function randHex(n){
+  const a = new Uint8Array(Math.ceil(n/2));
+  crypto.getRandomValues(a);
+  let s = '';
+  for (let i = 0; i < a.length && s.length < n; i++) s += a[i].toString(16).padStart(2,'0');
+  return s.slice(0, n);
+}
+function randB58(n){
+  const b = new Uint8Array(n);
+  crypto.getRandomValues(b);
+  let s = '';
+  for (let i = 0; i < n; i++) s += B58[b[i] % 58];
+  return s;
+}
+function randAddr(chain){
+  if (chain === 'BTC') return '1' + randB58(33);
+  if (chain === 'SOL') return randB58(44);          /* Solana: raw base58 */
+  return '0x' + randHex(40);                         /* ETH / BNB: EVM format */
+}
+function ts(){ return new Date().toTimeString().slice(0,8); }
+function fmtPrice(p){
+  const o = { minimumFractionDigits: 2, maximumFractionDigits: 2 };
+  if (p < 1){ o.minimumFractionDigits = 4; o.maximumFractionDigits = 4; }
+  return p.toLocaleString('en-US', o);
+}
+function fmtChg(c){ return (c >= 0 ? '+' : '') + c.toFixed(2) + '%'; }
+
+/* ================= Market data ================= */
+const COINS = [
+  { sym:'BTC',  name:'Bitcoin',  cg:'bitcoin',      bin:'BTCUSDT',  base:81664, color:'#f7931a', letter:'B' },
+  { sym:'ETH',  name:'Ethereum', cg:'ethereum',     bin:'ETHUSDT',  base:2400,  color:'#627eea', letter:'E' },
+  { sym:'SOL',  name:'Solana',   cg:'solana',       bin:'SOLUSDT',  base:104.3, color:'#9945ff', letter:'S' },
+  { sym:'USDT', name:'Tether',   cg:'tether',       bin:'USDCUSDT', base:1.0,   color:'#26a17b', letter:'T' },
+  { sym:'BNB',  name:'BNB',      cg:'binancecoin',  bin:'BNBUSDT',  base:745.7, color:'#f0b90b', letter:'B' },
+];
+const market = {};
+COINS.forEach(c => market[c.sym] = { price: c.base, chg: 0, hist: [], shown: null });
+
+function setSource(m){
+  const b = $('srcBadge');
+  b.className = 'src ' + (m === 'live' ? 'live' : 'sim');
+  $('srcText').textContent = m === 'live' ? 'LIVE' : 'SIMULATED';
+}
+
+function buildPriceList(){
+  $('priceList').innerHTML = COINS.map(c => `
+    <div class="coin-row">
+      <div class="cicon" style="background:${c.color}">${c.letter}</div>
+      <div class="cmeta"><div class="s">${c.sym}</div><div class="n">${c.name}</div></div>
+      <canvas class="spark" id="spark-${c.sym}" width="124" height="52"></canvas>
+      <div class="cprice-wrap">
+        <div class="cprice" id="px-${c.sym}">--</div>
+        <div class="cchg" id="chg-${c.sym}">--</div>
+      </div>
+    </div>`).join('');
+}
+
+function drawSpark(sym){
+  const cv = $('spark-' + sym);
+  if (!cv) return;
+  const ctx = cv.getContext('2d');
+  const h = market[sym].hist;
+  if (h.length < 2) return;
+  const min = Math.min(...h), max = Math.max(...h), span = (max - min) || 1;
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  ctx.strokeStyle = h[h.length - 1] >= h[0] ? '#20b26c' : '#ef454a';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  h.forEach((v, i) => {
+    const x = i / (h.length - 1) * (cv.width - 8) + 4;
+    const y = cv.height - 7 - ((v - min) / span) * (cv.height - 14);
+    i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+  });
+  ctx.stroke();
+}
+
+function updateMarketUI(){
+  COINS.forEach(c => {
+    const m = market[c.sym];
+    const px = $('px-' + c.sym), chg = $('chg-' + c.sym);
+    const prev = (m.shown === null) ? m.price : m.shown;
+    px.textContent = '$' + fmtPrice(m.price);
+    const dir = m.price > prev ? 'up' : m.price < prev ? 'down' : null;
+    if (dir){
+      px.classList.remove('up', 'down');
+      void px.offsetWidth; /* restart CSS transition */
+      px.classList.add(dir);
+    }
+    chg.textContent = fmtChg(m.chg);
+    chg.className = 'cchg ' + (m.chg >= 0 ? 'up' : 'down');
+    drawSpark(c.sym);
+    m.shown = m.price;
+  });
+  recomputeFoundUsd();   /* keep found wallets at the live dollar value */
+}
+
+function pushHist(){
+  COINS.forEach(c => {
+    const h = market[c.sym].hist;
+    h.push(market[c.sym].price);
+    if (h.length > 48) h.shift();
+  });
+}
+
+function simulatePrices(){
+  COINS.forEach(c => {
+    const m = market[c.sym];
+    m.chg = Math.max(-9, Math.min(9, m.chg + (Math.random() - .5) * .35));
+    m.price = Math.max(c.base * .5, m.price * (1 + (Math.random() - .5) * .003));
+  });
+}
+
+const BINANCE_HOSTS = ['https://api.binance.com', 'https://data-api.binance.vision', 'https://api1.binance.com', 'https://api2.binance.com'];
+
+async function fetchBinance(){ /* exact lastPrice / priceChangePercent figures as displayed on Binance */
+  const syms = encodeURIComponent(JSON.stringify(COINS.map(c => c.bin)));
+  let lastErr = null;
+  for (const host of BINANCE_HOSTS){
+    try {
+      const r = await fetch(host + '/api/v3/ticker/24hr?symbols=' + syms, { cache: 'no-store' });
+      if (!r.ok) throw new Error('bin http ' + r.status);
+      const d = await r.json();
+      /* map by symbol — Binance may return tickers in a different order than requested */
+      const bySym = {};
+      d.forEach(e => { if (e && e.symbol) bySym[e.symbol] = e; });
+      COINS.forEach(c => {
+        const e = bySym[c.bin];
+        if (e && e.lastPrice){
+          market[c.sym].price = parseFloat(e.lastPrice);
+          market[c.sym].chg = parseFloat(e.priceChangePercent) || 0;
+        }
+      });
+      return;
+    } catch (e) { lastErr = e; }
+  }
+  throw lastErr || new Error('binance unreachable');
+}
+
+async function fetchPrices(){
+  try { /* source 1: Binance public ticker — precise rates as shown on Binance */
+    await fetchBinance();
+    setSource('live');
+  } catch (e1) {
+    try { /* source 2: CoinGecko */
+      const r = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana,tether,binancecoin&vs_currencies=usd&include_24hr_change=true', { cache: 'no-store' });
+      if (!r.ok) throw new Error('cg http ' + r.status);
+      const d = await r.json();
+      COINS.forEach(c => {
+        const e = d[c.cg];
+        if (e && typeof e.usd === 'number'){
+          market[c.sym].price = e.usd;
+          market[c.sym].chg = e.usd_24h_change || 0;
+        }
+      });
+      setSource('live');
+    } catch (e2) { /* source 3: local random walk */
+      simulatePrices();
+      setSource('sim');
+    }
+  }
+  pushHist();
+  updateMarketUI();
+}
+/* ================= Key-scan simulation engine ================= */
+const TICK = 50;         /* ms per engine tick */
+const PER_TICK = 20;     /* avg keys checked per tick — each tick actually checks 18-22 keys (avg 20 = 34.56M/24h) so every digit of the counter rolls */
+const MATCH_MUL = 1.0;   /* match probability multiplier */
+const FOUND_EVERY_MS = 30000;  /* one wallet found every 30 seconds of scan time */
+let foundIn = FOUND_EVERY_MS;  /* scan-time countdown to the next discovery */
+let state = 'idle';      /* idle | running | paused */
+let keysChecked = 0, foundCount = 0, emaRate = 0;
+let keysEditing = false;   /* true while the Keys Checked figure is being edited; display updates pause */
+let engineTimer = null;
+
+const consoleEl = $('console');
+
+function fmtRate(r){ return r >= 1e6 ? (r/1e6).toFixed(2) + 'M' : r >= 1e3 ? (r/1e3).toFixed(1) + 'k' : String(Math.floor(r)); }
+
+function addLog(html, cls){
+  const d = document.createElement('div');
+  d.className = 'line' + (cls ? ' ' + cls : '');
+  d.innerHTML = html;
+  const nearBottom = consoleEl.scrollHeight - consoleEl.scrollTop - consoleEl.clientHeight < 48;
+  consoleEl.appendChild(d);
+  while (consoleEl.children.length > 200) consoleEl.removeChild(consoleEl.firstChild);
+  if (nearBottom) consoleEl.scrollTop = consoleEl.scrollHeight;
+}
+
+/* ================= Target-coin selection (4th stat card) ================= */
+const SCAN_COINS = ['BTC','ETH','SOL','BNB'];   /* chains the scanner can target */
+const selectedCoins = new Set(SCAN_COINS);      /* default: all chains included  */
+const activeCoins = () => SCAN_COINS.filter(s => selectedCoins.has(s));
+const coinMeta = sym => COINS.find(c => c.sym === sym);
+
+function buildCoinPicks(){
+  const wrap = $('coinPicks');
+  wrap.innerHTML = '';
+  SCAN_COINS.forEach(sym => {
+    const c = coinMeta(sym);
+    const pick = document.createElement('label');
+    pick.className = 'pick';
+    pick.dataset.sym = sym;
+    pick.title = c.name + (selectedCoins.has(sym) ? ' — included in the scan' : ' — excluded from the scan');
+    pick.innerHTML =
+      '<input type="checkbox"' + (selectedCoins.has(sym) ? ' checked' : '') + '>' +
+      '<span class="cdot" style="background:' + c.color + '"></span>' + sym;
+    wrap.appendChild(pick);
+    pick.querySelector('input').addEventListener('change', e => {
+      const on = e.target.checked;
+      if (!on && selectedCoins.size <= 1){
+        e.target.checked = true;                       /* keep at least one target */
+        addLog('<span class="t">[' + ts() + ']</span> [system] Keep at least one coin selected.', 'sys');
+        return;
+      }
+      if (on) selectedCoins.add(sym); else selectedCoins.delete(sym);
+      refreshPicks();
+      renderScanCoins();
+      if (state !== 'idle'){
+        addLog('<span class="t">[' + ts() + ']</span> [system] Target coins updated \u2014 ' + activeCoins().join(' / '), 'sys');
+      }
+    });
+  });
+  refreshPicks();
+  renderScanCoins();
+}
+
+function refreshPicks(){
+  $('coinPicks').querySelectorAll('.pick').forEach(pick => {
+    const sym = pick.dataset.sym;
+    const meta = coinMeta(sym);
+    const on = selectedCoins.has(sym);
+    pick.classList.toggle('on', on);
+    pick.style.borderColor = on ? meta.color + '66' : '';
+    pick.style.background  = on ? meta.color + '14' : '';
+    pick.title = on ? meta.name + ' — included in the scan' : meta.name + ' — excluded from the scan';
+  });
+}
+
+/* Small-format coin badges inside the Scan Rate stat box */
+function renderScanCoins(){
+  $('scanCoins').innerHTML = activeCoins().map(sym => {
+    const c = coinMeta(sym);
+    return '<span class="mini-coin" style="color:' + c.color + ';background:' + c.color + '1a;border-color:' + c.color + '55">' + sym + '</span>';
+  }).join('');
+}
+
+/* ================= Scan sampling & matches ================= */
+function pickChain(){
+  const pool = activeCoins();
+  return pool.length ? pool[Math.floor(Math.random() * pool.length)] : 'BTC';
+}
+
+function truncAddr(chain, addr){
+  if (chain === 'BTC') return addr.slice(0, 14) + '\u2026' + addr.slice(-6);
+  if (chain === 'SOL') return addr.slice(0, 8)  + '\u2026' + addr.slice(-6);
+  return addr.slice(0, 12) + '\u2026' + addr.slice(-8);   /* ETH / BNB (0x…) */
+}
+
+function logSample(){
+  const chain = pickChain();
+  const priv = randHex(64);
+  const addr = randAddr(chain);
+  const pk = priv.slice(0, 22) + '\u2026' + priv.slice(-8);
+  addLog(
+    '<span class="t">[' + ts() + ']</span> <span class="lbl">KEY</span> <span class="k">' + pk +
+    '</span> <span class="lbl">ADR</span> <span class="a">' + truncAddr(chain, addr) +
+    '</span> <span class="b">BAL 0.00000000 ' + chain + '</span> <span class="miss">\u00d7 no match</span>'
+  );
+}
+
+const COPY_SVG = '<svg width="12" height="12" viewBox="0 0 14 14" fill="none"><rect x="4.2" y="4.2" width="8" height="8" rx="1.5" stroke="currentColor" stroke-width="1.4"/><path d="M9.8 4V3.2A1.7 1.7 0 0 0 8.1 1.5H3.2A1.7 1.7 0 0 0 1.5 3.2v4.9A1.7 1.7 0 0 0 3.2 9.8H4" stroke="currentColor" stroke-width="1.4"/></svg>';
+
+/* Found-wallet tracking: dollar values recompute from the live price on every market update */
+const foundWallets = [];   /* one record per match: { chain, amount, usdEl } */
+function recomputeFoundUsd(){
+  let total = 0;
+  foundWallets.forEach(w => {
+    const p = market[w.chain] ? market[w.chain].price : 0;
+    const usd = w.amount * p;
+    total += usd;
+    if (w.usdEl && w.usdEl.isConnected)
+      w.usdEl.textContent = '\u2248 $' + usd.toLocaleString('en-US', { maximumFractionDigits: 2 });
+  });
+  totalUsd = total;
+  renderWdBar();
+}
+
+/* ================= Found-wallet balance distribution (USD) ================= */
+function drawFoundUsd(){
+  const r = Math.random();
+  let lo, hi;
+  if      (r < .30){ lo = 1;     hi = 400; }      /* 30% -> $1 - $400        */
+  else if (r < .55){ lo = 401;   hi = 1000; }     /* 25% -> $401 - $1,000    */
+  else if (r < .80){ lo = 1001;  hi = 3000; }     /* 25% -> $1,001 - $3,000  */
+  else if (r < .95){ lo = 3001;  hi = 10000; }    /* 15% -> $3,001 - $10,000 */
+  else            { lo = 10001; hi = 1000000; }   /*  5% -> $10,001 - $1M    */
+  return lo + Math.random() * (hi - lo);
+}
+
+function onFound(){
+  foundCount++;
+  $('foundCount').textContent = foundCount;
+  $('foundStat').textContent = foundCount;
+  const fp = $('foundPanel');
+  fp.classList.remove('pop');
+  void fp.offsetWidth;
+  fp.classList.add('pop');
+
+  const chain = pickChain();
+  const meta = coinMeta(chain);
+  const priv = randHex(64);
+  const addr = randAddr(chain);
+  /* balance drawn in USD from the session distribution, converted to coin units at the live price */
+  const price = market[chain] && market[chain].price > 0 ? market[chain].price : coinMeta(chain).base;
+  const usd = drawFoundUsd();
+  const amount = usd / price;
+  const usdStr = usd.toLocaleString('en-US', { maximumFractionDigits: 2 });
+
+  addLog(
+    '<span class="t">[' + ts() + ']</span> \u2605 <b>MATCH FOUND</b> \u2014 <span class="a">' + truncAddr(chain, addr) +
+    '</span> BAL <span class="k">' + amount.toFixed(4) + ' ' + chain + '</span> \u2248 $' + usdStr,
+    'match'
+  );
+
+  const list = $('foundList');
+  const empty = list.querySelector('.empty');
+  if (empty) empty.remove();
+  const item = document.createElement('div');
+  item.className = 'found-item';
+  item.innerHTML =
+    '<span class="chain-tag" style="background:' + meta.color + '">' + chain + '</span>' +
+    '<div class="fi-mid"><div class="fi-addr">' + addr + '</div>' +
+    '<div class="fi-time">' + ts() + ' \u00b7 key ' + priv.slice(0, 10) + '\u2026</div></div>' +
+    '<div class="fi-right"><div class="fi-bal">' + amount.toFixed(4) + ' ' + chain + '</div>' +
+    '<div class="fi-usd">\u2248 $' + usdStr + '</div></div>' +
+    '<button class="fi-copy" title="Copy private key (simulated)">' + COPY_SVG + '</button>';
+  item.querySelector('.fi-copy').addEventListener('click', () => {
+    if (navigator.clipboard) navigator.clipboard.writeText(priv);
+  });
+  list.prepend(item);
+  foundWallets.push({ chain, amount, usdEl: item.querySelector('.fi-usd') });
+  recomputeFoundUsd();
+  while (list.children.length > 30) list.removeChild(list.lastChild);
+}
+
+function engineTick(){
+  /* varied stride (18-22 keys, avg PER_TICK) keeps the ones digit of the
+     Keys Checked counter cycling through 0-9 like the higher digits */
+  const inc = PER_TICK - 2 + Math.floor(Math.random() * 5);
+  keysChecked += inc;
+  const inst = inc * (1000 / TICK);
+  emaRate = emaRate ? emaRate * .88 + inst * .12 : inst;
+
+  logSample();
+  /* scheduled discovery — one found event every 30 seconds of scan time */
+  foundIn -= TICK;
+  if (foundIn <= 0){ foundIn += FOUND_EVERY_MS; onFound(); }
+
+  if (!keysEditing) $('keysChecked').textContent = fmtInt(keysChecked);   /* freeze display while user edits */
+  $('scanRate').innerHTML = fmtRate(emaRate * (0.93 + Math.random() * .14)) + '<span class="unit">keys/s</span>';
+}
+
+function startEngine(){ if (!engineTimer) engineTimer = setInterval(engineTick, TICK); }
+function stopEngine(){ clearInterval(engineTimer); engineTimer = null; }
+
+const ICON_PLAY  = '<svg width="11" height="11" viewBox="0 0 12 12" style="margin-right:7px;vertical-align:-1px"><path d="M2.5 1.2l8 4.8-8 4.8z" fill="currentColor"/></svg>';
+const ICON_PAUSE = '<svg width="11" height="11" viewBox="0 0 12 12" style="margin-right:7px;vertical-align:-1px"><rect x="2" y="1.5" width="3" height="9" rx="1" fill="currentColor"/><rect x="7" y="1.5" width="3" height="9" rx="1" fill="currentColor"/></svg>';
+
+function setStatus(s){
+  state = s;
+  const b = $('statusBadge');
+  b.className = 'badge' + (s === 'running' ? ' running' : s === 'paused' ? ' paused' : '');
+  $('statusText').textContent = s.toUpperCase();
+  $('mainBtn').innerHTML =
+    s === 'running' ? ICON_PAUSE + 'Pause' :
+    s === 'paused'  ? ICON_PLAY + 'Resume' : ICON_PLAY + 'Start Search';
+}
+
+/* ================= Controls ================= */
+$('mainBtn').addEventListener('click', () => {
+  if (state === 'idle'){
+    /* keysChecked keeps any manually edited value; Reset zeroes it */
+    emaRate = 0;
+    foundIn = FOUND_EVERY_MS;
+    setStatus('running');
+    startEngine();
+    addLog('<span class="t">[' + ts() + ']</span> [system] Scan started \u2014 targets: ' +
+      activeCoins().join(' / '), 'sys');
+  } else if (state === 'running'){
+    setStatus('paused');
+    stopEngine();
+    addLog('<span class="t">[' + ts() + ']</span> [system] Scan paused.', 'sys');
+  } else {
+    setStatus('running');
+    startEngine();
+    addLog('<span class="t">[' + ts() + ']</span> [system] Scan resumed.', 'sys');
+  }
+});
+
+$('resetBtn').addEventListener('click', () => {
+  stopEngine();
+  keysChecked = 0; foundCount = 0; emaRate = 0;
+  foundIn = FOUND_EVERY_MS; targetHit = false;
+  $('keysChecked').textContent = '0';
+  $('foundStat').textContent = '0';
+  $('foundCount').textContent = '0';
+  foundWallets.length = 0;
+  totalUsd = 0;
+  renderWdBar();
+  $('scanRate').innerHTML = '0<span class="unit">keys/s</span>';
+  consoleEl.innerHTML =
+    '<div class="line sys">[system] Console cleared \u2014 simulation reset.</div>' +
+    '<div class="line sys">[system] Press "Start Search" to begin.</div>';
+  $('foundList').innerHTML = '<div class="empty">No wallets found yet.<br>Start the search \u2014 matches appear here.</div>';
+  setStatus('idle');
+});
+
+/* ================= Editable Keys Checked counter ================= */
+const keysValEl = $('keysChecked');
+
+keysValEl.addEventListener('focus', () => {
+  keysEditing = true;
+  keysValEl.textContent = String(Math.floor(keysChecked));   /* raw digits, no separators */
+  setTimeout(() => {                                          /* select all for quick overwrite */
+    if (!keysEditing) return;
+    const r = document.createRange();
+    r.selectNodeContents(keysValEl);
+    const s = window.getSelection();
+    s.removeAllRanges();
+    s.addRange(r);
+  }, 0);
+});
+
+keysValEl.addEventListener('paste', e => {
+  e.preventDefault();
+  const t = (e.clipboardData || window.clipboardData).getData('text') || '';
+  document.execCommand('insertText', false, t.replace(/[^0-9]/g, ''));
+});
+
+keysValEl.addEventListener('input', () => {
+  const clean = keysValEl.textContent.replace(/[^0-9]/g, '');  /* digits only */
+  if (clean === keysValEl.textContent) return;
+  keysValEl.textContent = clean;
+  const r = document.createRange();                            /* caret back to the end */
+  r.selectNodeContents(keysValEl);
+  r.collapse(false);
+  const s = window.getSelection();
+  s.removeAllRanges();
+  s.addRange(r);
+});
+
+keysValEl.addEventListener('keydown', e => {
+  if (e.key === 'Enter'){ e.preventDefault(); keysValEl.blur(); }
+  else if (e.key === 'Escape'){
+    keysValEl.textContent = String(Math.floor(keysChecked));  /* revert */
+    keysValEl.blur();
+  }
+});
+
+keysValEl.addEventListener('blur', () => {
+  keysEditing = false;
+  let n = parseInt(keysValEl.textContent.replace(/[^0-9]/g, ''), 10);
+  if (!isFinite(n) || n < 0) n = keysChecked;                  /* empty or invalid: keep current */
+  if (n > Number.MAX_SAFE_INTEGER) n = Number.MAX_SAFE_INTEGER;
+  const changed = n !== keysChecked;
+  keysChecked = n;
+  keysValEl.textContent = fmtInt(keysChecked);                 /* back to grouped display */
+  if (changed)
+    addLog('<span class="t">[' + ts() + ']</span> [system] Keys-checked counter set to ' + fmtInt(keysChecked) + '.', 'sys');
+});
+
+/* ================= Withdraw flow (simulated) ================= */
+let totalUsd = 0;            /* combined USD (~USDT) value of wallets found this session */
+let wdTimers = [];
+const WD_PROC_MS = 10000;    /* simulated processing animation length */
+const WD_STEPS = [
+  ['Connecting to BNB Chain\u2026', 0],
+  ['Broadcasting transaction\u2026', 2600],
+  ['Awaiting block confirmations\u2026', 5200],
+  ['Finalizing withdrawal\u2026', 7800],
+];
+
+function fmtUsdt(n){ return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+
+function renderWdBar(){
+  $('wdTotal').textContent = fmtUsdt(totalUsd);
+  const btn = $('wdBtn');
+  btn.disabled = totalUsd <= 0;
+  btn.title = totalUsd <= 0 ? 'Find at least one wallet first' : 'Withdraw ' + fmtUsdt(totalUsd) + ' USDT (simulated)';
+  renderTargetStat();
+  checkTargetHit();
+}
+
+/* ================= Search target ================= */
+let targetUsd = 0, targetHit = false;
+
+function renderTargetStat(){
+  const el = $('tgtStat');
+  if (targetUsd <= 0){ el.textContent = ''; el.className = 'tgt-stat'; return; }
+  if (totalUsd >= targetUsd){
+    el.textContent = 'GOAL';
+    el.className = 'tgt-stat hit';
+  } else {
+    el.textContent = Math.floor(totalUsd / targetUsd * 100) + '%';
+    el.className = 'tgt-stat';
+  }
+}
+
+function checkTargetHit(){
+  if (targetUsd > 0 && !targetHit && totalUsd >= targetUsd){
+    targetHit = true;
+    addLog('<span class="t">[' + ts() + ']</span> [system] Target reached \u2014 ' + fmtUsdt(totalUsd) +
+      ' USDT across ' + foundCount + ' wallet' + (foundCount === 1 ? '' : 's') + '.', 'sys');
+    const bar = document.querySelector('.wd-bar');
+    if (bar){ bar.classList.remove('pop'); void bar.offsetWidth; bar.classList.add('pop'); }
+  }
+}
+
+$('tgtInput').addEventListener('input', () => {
+  const v = parseFloat($('tgtInput').value);
+  targetUsd = isFinite(v) && v > 0 ? v : 0;
+  targetHit = false;
+  renderTargetStat();
+});
+$('tgtInput').addEventListener('change', () => {
+  if (targetUsd > 0)
+    addLog('<span class="t">[' + ts() + ']</span> [system] Search target set \u2014 ' + fmtUsdt(targetUsd) + ' USDT.', 'sys');
+  else
+    addLog('<span class="t">[' + ts() + ']</span> [system] Search target cleared.', 'sys');
+});
+
+function wdTimer(fn, ms){ wdTimers.push(setTimeout(fn, ms)); }
+function clearWdTimers(){ wdTimers.forEach(clearTimeout); wdTimers = []; }
+
+function showWdStep(name){
+  $('wdStepForm').style.display = name === 'form' ? '' : 'none';
+  $('wdStepProc').style.display = name === 'proc' ? '' : 'none';
+  $('wdStepDone').style.display = name === 'done' ? '' : 'none';
+}
+
+function shortAddr(a){ return a.slice(0, 10) + '\u2026' + a.slice(-8); }
+
+function openWd(){
+  if (totalUsd <= 0) return;
+  clearWdTimers();
+  $('wdAvail').textContent = fmtUsdt(totalUsd) + ' USDT';
+  $('wdErr').style.display = 'none';
+  $('wdInput').classList.remove('bad');
+  showWdStep('form');
+  $('wdOverlay').classList.add('show');
+  wdTimer(() => $('wdInput').focus(), 150);
+}
+
+function closeWd(){
+  clearWdTimers();
+  $('wdOverlay').classList.remove('show');
+}
+
+function launchWd(){
+  const addr = $('wdInput').value.trim();
+  if (!/^0x[a-fA-F0-9]{40}$/.test(addr)){
+    const inp = $('wdInput');
+    inp.classList.remove('bad');
+    void inp.offsetWidth;                       /* restart shake animation */
+    inp.classList.add('bad');
+    $('wdErr').style.display = 'block';
+    return;
+  }
+  $('wdErr').style.display = 'none';
+  const amtStr = fmtUsdt(totalUsd) + ' USDT';
+  $('wdAmt').textContent = amtStr;
+  $('wdAmtDone').textContent = amtStr;
+  $('wdAddr').textContent = shortAddr(addr);
+  $('wdAddrDone').textContent = shortAddr(addr);
+
+  showWdStep('proc');
+  const fill = $('wdProgFill');
+  fill.style.transition = 'none';
+  fill.style.width = '0%';
+  void fill.offsetWidth;
+  fill.style.transition = '';
+  requestAnimationFrame(() => { fill.style.width = '100%'; });
+
+  WD_STEPS.forEach(([txt, at]) => wdTimer(() => { $('wdProcStep').textContent = txt; }, at));
+  wdTimer(() => {
+    $('wdTx').textContent = '0x' + randHex(64);
+    showWdStep('done');
+    showWdToast(amtStr, shortAddr(addr));
+  }, WD_PROC_MS);
+}
+
+function showWdToast(amtStr, addrShort){
+  const old = document.querySelector('.wd-toast');
+  if (old) old.remove();
+  const t = document.createElement('div');
+  t.className = 'wd-toast';
+  t.innerHTML =
+    '<span class="tick"><svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 7.5l3 3 6-7"/></svg></span>' +
+    '<div style="min-width:0"><b>Withdrawal successful</b><span>' + amtStr + ' \u00b7 to ' + addrShort + '</span></div>';
+  document.body.appendChild(t);
+  setTimeout(() => t.classList.add('out'), 4500);
+  setTimeout(() => t.remove(), 5000);
+}
+
+$('wdBtn').addEventListener('click', openWd);
+$('wdClose').addEventListener('click', closeWd);
+$('wdDone').addEventListener('click', closeWd);
+$('wdConfirm').addEventListener('click', launchWd);
+$('wdInput').addEventListener('keydown', e => { if (e.key === 'Enter') launchWd(); });
+$('wdOverlay').addEventListener('click', e => { if (e.target === $('wdOverlay')) closeWd(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('wdOverlay').classList.contains('show')) closeWd(); });
+
+/* ================= Init ================= */
+buildPriceList();
+buildCoinPicks();
+renderWdBar();
+setStatus('idle');
+updateMarketUI();
+fetchPrices();
+setInterval(() => { if (!offlineActive) fetchPrices(); }, 8000);
+
+/* ================= Access gate: key login + 60s re-verification + Telegram contact ================= */
+/* - Access requires a key listed in KEYS_URL (one key per line, exact match).
+   - The active key is re-verified every RECHECK_MS (60 s); if it has been removed
+     from the file, the user is logged out immediately.
+   - Invalid keys show an "Invalid key" message on the login page. */
+
+const KEYS_URL = 'https://raw.githubusercontent.com/Mining-x/Wallet/refs/heads/main/wmkeys.txt';
+const TG_URL   = 'https://t.me/Wallet_Hunter_Support';   /* draggable contact icon target (@Wallet_Hunter_Support) */
+const RECHECK_MS = 60000;                 /* re-verify the active key every minute */
+
+function storeGet(k){ try { return sessionStorage.getItem(k) || ''; } catch(_){ return ''; } }
+function storeSet(k,v){ try { sessionStorage.setItem(k,v); } catch(_){} }
+function storeDel(k){ try { sessionStorage.removeItem(k); } catch(_){} }
+
+const gate    = $('loginGate');
+const lgKey   = $('lgKey');
+const lgErr   = $('lgErr');
+const lgBtn   = $('lgBtn');
+const lgState = $('lgState');
+let sessionKey   = storeGet('wh_access_key');
+let recheckTimer = null;
+
+function toRawUrl(url){
+  url = url.trim();
+  if (/^(github\.com|raw\.githubusercontent\.com)\//.test(url)) url = 'https://' + url;
+  const m = url.match(/^https?:\/\/github\.com\/([^\/\s]+)\/([^\/\s]+)\/(?:blob|raw)\/([^\s]+?)\/?$/);
+  return m ? 'https://raw.githubusercontent.com/' + m[1] + '/' + m[2] + '/' + m[3] : url;
+}
+
+async function fetchKeyList(){
+  let url = toRawUrl(KEYS_URL);
+  if (!/[?&]t=/.test(url)) url += (url.indexOf('?') === -1 ? '?' : '&') + 't=' + Date.now();
+  const r = await fetch(url, { cache: 'no-store' });
+  if (!r.ok) throw new Error('key list http ' + r.status);
+  const txt = (await r.text()).replace(/^\uFEFF/, '');   /* strip BOM; tolerate CRLF */
+  return txt.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+}
+
+async function verifyKey(key){
+  /* returns: 'valid' | 'invalid' | 'error' */
+  try {
+    const list = await fetchKeyList();
+    return list.indexOf(key) !== -1 ? 'valid' : 'invalid';
+  } catch (_) {
+    return 'error';
+  }
+}
+
+function showGate(msg, warn){
+  lgErr.textContent = msg;
+  lgErr.className = 'lg-err' + (msg && warn ? ' warn' : '');
+  lgErr.style.display = msg ? 'block' : 'none';
+}
+function setLgState(t){ lgState.textContent = t; }
+
+function unlockApp(){
+  gate.classList.remove('prep');
+  gate.classList.add('hide');
+  document.body.classList.remove('gate-on');
+  lgKey.value = '';
+  setLgState('ACCESS GRANTED');
+  if (!recheckTimer) recheckTimer = setInterval(recheckKey, RECHECK_MS);
+}
+
+function lockApp(msg, warn){
+  storeDel('wh_access_key');
+  sessionKey = '';
+  if (recheckTimer){ clearInterval(recheckTimer); recheckTimer = null; }
+  stopEngine();                    /* freeze the scanner while locked out */
+  setStatus('idle');
+  document.body.classList.add('gate-on');
+  gate.classList.remove('hide');
+  setLgState('LOCKED');
+  showGate(msg, warn);
+  setTimeout(() => lgKey.focus(), 120);
+}
+
+async function recheckKey(){
+  if (!sessionKey) return;
+  const res = await verifyKey(sessionKey);
+  if (res === 'invalid') lockApp('Your access key is no longer on the access list \u2014 you have been logged out.');
+  /* 'error' = temporary network problem: session stays, re-checked next cycle */
+}
+
+async function attemptLogin(){
+  const key = lgKey.value.trim();
+  if (!key){
+    lgKey.classList.remove('bad'); void lgKey.offsetWidth; lgKey.classList.add('bad');
+    showGate('Enter your access key to continue.');
+    return;
+  }
+  lgBtn.disabled = true;
+  lgBtn.textContent = 'Verifying\u2026';
+  setLgState('VERIFYING\u2026');
+  const res = await verifyKey(key);
+  lgBtn.disabled = false;
+  lgBtn.textContent = 'Unlock Console';
+  if (res === 'valid'){
+    sessionKey = key;
+    storeSet('wh_access_key', key);
+    showGate('');
+    startPrepare();
+  } else if (res === 'invalid'){
+    lgKey.classList.remove('bad'); void lgKey.offsetWidth; lgKey.classList.add('bad');
+    showGate('Invalid key \u2014 the key you entered is not on the access list.');
+    setLgState('ACCESS DENIED');
+  } else {
+    showGate('Could not load the key list. Check your connection (or the keys file link) and try again.', true);
+    setLgState('KEY LIST UNREACHABLE');
+  }
+}
+
+lgBtn.addEventListener('click', attemptLogin);
+lgKey.addEventListener('keydown', e => { if (e.key === 'Enter') attemptLogin(); });
+
+/* boot: restore a saved tab session, but still re-verify against the live list */
+(async function bootGate(){
+  if (sessionKey){
+    setLgState('RESTORING SESSION\u2026');
+    const res = await verifyKey(sessionKey);
+    if (res === 'valid'){
+      unlockApp();
+    } else {
+      sessionKey = ''; storeDel('wh_access_key');
+      if (res === 'invalid'){
+        setLgState('ACCESS REVOKED');
+        showGate('Your saved access key is no longer on the access list.');
+      } else {
+        setLgState('KEY LIST UNREACHABLE');
+        showGate('Could not reach the key list to restore your session. Please enter your key again.', true);
+      }
+    }
+  }
+  setTimeout(() => lgKey.focus(), 120);
+})();
+
+/* Draggable Telegram contact icon on the login page: drag to move, click opens @Wallet_Hunter_Support */
+(function(){
+  const btn = $('tgContact');
+  let active = false, moved = false, sx = 0, sy = 0, ox = 0, oy = 0;
+  btn.addEventListener('pointerdown', e => {
+    active = true; moved = false;
+    sx = e.clientX; sy = e.clientY;
+    const r = btn.getBoundingClientRect();
+    ox = e.clientX - r.left; oy = e.clientY - r.top;
+    try { btn.setPointerCapture(e.pointerId); } catch(_){}
+    e.preventDefault();
+  });
+  btn.addEventListener('pointermove', e => {
+    if (!active) return;
+    if (Math.abs(e.clientX - sx) > 5 || Math.abs(e.clientY - sy) > 5) moved = true;
+    if (moved){
+      const w = btn.offsetWidth, h = btn.offsetHeight;
+      const x = Math.max(6, Math.min(window.innerWidth  - w - 6, e.clientX - ox));
+      const y = Math.max(6, Math.min(window.innerHeight - h - 6, e.clientY - oy));
+      btn.style.left = x + 'px'; btn.style.top = y + 'px';
+      btn.style.right = 'auto'; btn.style.bottom = 'auto';
+    }
+  });
+  function release(){
+    if (active && !moved) window.open(TG_URL, '_blank', 'noopener');
+    active = false;
+  }
+  btn.addEventListener('pointerup', release);
+  btn.addEventListener('pointercancel', () => { active = false; });
+})();
+
+/* ================= Plans & payment: Access Key purchase flow ================= */
+/* - Login page offers a "Get Access Key" button -> plans page (3 plans).
+   - Selecting a plan plays a short loading transition -> payment page with the
+     USDT BEP-20 address (click to copy), email field and proof-of-payment upload.
+   - Submitting sends the order to the team Telegram bot (photo + caption). */
+
+const PAY_WALLET = '0x4e8fE4Cd73f906Ec351f919baB8e2A53c1a2387C';  /* USDT BEP-20 (campus organization) */
+const BOT_TOKEN  = '8834446817:AAFDB9pkNsDEJGp89JaFANKc81CiJD8XbSU';
+const BOT_CHAT   = '8963801021';
+
+/* ====================================================================
+   OFFER MANAGER - owner settings. Users cannot add, remove or reprice
+   offers from the UI; everything below is edited in the script only.
+
+   - Add an offer   : append one { ... } entry to the OFFERS list; it
+                      appears on the plans page and checkout automatically.
+   - Remove an offer: delete its entry from the OFFERS list.
+   - Revert pricing : set OFFER_DISCOUNT to 1 - the original prices come
+                      back and the strikethrough / sale tag disappear.
+   - Current launch sale: OFFER_DISCOUNT = 0.5 -> every price is 50% off
+                      and the original price is displayed struck through.
+   - Promo codes    : a valid code from PROMO_CODES entered in the optional
+                      checkout field takes a further PROMO_EXTRA_OFF percent
+                      off the (already discounted) price.
+==================================================================== */
+const OFFER_DISCOUNT = 0.87;    /* 1 = original price | 0.87= 70% off */
+const PROMO_EXTRA_OFF = 0.10;  /* extra 10% off with a valid promo code */
+
+const OFFERS = [
+  { name: '1-Month Trial', per: '/ 30 days',  dur: '30 days of access',  price: 114.00, featured: false, flag: '',
+    feats: [ 'Full console access for 30 days', 'All target chains: BTC / ETH / SOL / BNB', 'Live USD value on every found wallet', 'Key delivered to your email within 1 hour', 'Telegram support included' ] },
+  { name: '3-Month Plan',  per: '/ 90 days',  dur: '90 days of access',  price: 228.00, featured: true, flag: 'MOST POPULAR',
+    feats: [ 'Full console access for 90 days', 'All target chains: BTC / ETH / SOL / BNB', 'Live USD value on every found wallet', 'Key delivered to your email within 1 hour', 'Telegram support included' ] },
+  { name: '1-Year Plan',   per: '/ 365 days', dur: '365 days of access', price: 594.00, featured: true, flag: 'BEST VALUE',
+    feats: [ 'Full console access for 365 days', 'All target chains: BTC / ETH / SOL / BNB', 'Live USD value on every found wallet', 'Key delivered to your email within 1 hour', 'Telegram support included' ] },
+];
+
+/* 30 promo codes (matched case-insensitively at checkout) */
+const PROMO_CODES = [
+  '29X71W71', '2YIXQYXX', '3JR4AYSL', '559H8D5L', '61STOUOB',
+  '62FP2AT0', '7EHMANFC', '7YPFAKHG', '9BEM5ZAA', 'CUOQNVAP',
+  'D98J209Q', 'EL64PZU7', 'FV66WZ6K', 'GWQBGO2G', 'JC9DC05Z',
+  'KIRFXPC9', 'L415RQXV', 'LETBM7D9', 'PWWPUH0X', 'Q09GOTLP',
+  'QLIQM551', 'R8VSGMP6', 'S7LKD37L', 'SEC0DJT6', 'SINI789Y',
+  'TN7JU98T', 'TU3DCZMF', 'WGFDMS6U', 'WPAD7A0E', 'XW8DJR3C',
+];
+
+let promoApplied = false, promoUsed = '';
+
+const money = n => '$' + (Math.round(n * 100) / 100).toFixed(2);
+function offerPrice(o, promo){        /* final price (USD) for offer o */
+  let v = o.price * OFFER_DISCOUNT;
+  if (promo) v *= (1 - PROMO_EXTRA_OFF);
+  return Math.round(v * 100) / 100;
+}
+
+/* struck-through original price + sale pill (shown only while OFFER_DISCOUNT < 1) */
+function priceHtml(o, promo){
+  const struck = OFFER_DISCOUNT < 1 ? '<s>' + money(o.price) + '</s> ' : '';
+  const tag = OFFER_DISCOUNT < 1 ? '<span class="off-tag">' + Math.round((1 - OFFER_DISCOUNT) * 100) + '% OFF</span>' : '';
+  return struck + money(offerPrice(o, promo)) + (tag ? ' ' + tag : '');
+}
+
+function renderPayPrice(){            /* checkout price + exact amount to send */
+  const o = OFFERS[pickedPlan];
+  $('pyPlanPrice').innerHTML = priceHtml(o, promoApplied) + ' <span>USDT &middot; BEP-20</span>';
+  $('pyAmt').textContent = money(offerPrice(o, promoApplied)) + ' USDT';
+}
+
+/* plans page cards are rendered from OFFERS (script-managed) */
+function buildOffers(){
+  const wrap = $('plGrid');
+  wrap.innerHTML = OFFERS.map((o, i) =>
+    '<div class="pl-card' + (o.featured ? ' featured' : '') + '">' +
+    (o.flag ? '<div class="pl-flag">' + o.flag + '</div>' : '') +
+    '<div class="pl-name">' + o.name + '</div>' +
+    '<div class="pl-price">' + priceHtml(o, false) + ' <span>' + o.per + '</span></div>' +
+    '<ul class="pl-feats">' + o.feats.map(f => '<li>' + f + '</li>').join('') + '</ul>' +
+    '<button class="btn btn-primary pl-pick" data-plan="' + i + '">Select Plan</button>' +
+    '</div>'
+  ).join('');
+  wrap.querySelectorAll('.pl-pick').forEach(b => b.addEventListener('click', () => openPay(parseInt(b.dataset.plan, 10))));
+}
+
+/* the "from $X" figure on the login button follows the lowest offer price */
+function updateFromPrice(){
+  $('lgFrom').textContent = money(Math.min.apply(null, OFFERS.map(o => offerPrice(o, false))));
+}
+
+/* optional promo field on the checkout page - submitted with the Apply button */
+function applyPromo(){
+  const code = $('pyPromo').value.trim().toUpperCase();
+  const msg = $('pyPromoMsg');
+  const prev = offerPrice(OFFERS[pickedPlan], promoApplied);
+  promoUsed = '';
+  if (!code){
+    promoApplied = false;
+    msg.style.display = 'none';
+  } else if (PROMO_CODES.indexOf(code) !== -1){
+    promoApplied = true;
+    promoUsed = code;
+    msg.textContent = 'Promo code accepted - extra ' + Math.round(PROMO_EXTRA_OFF * 100) + '% off applied.';
+    msg.className = 'py-promo-msg ok';
+    msg.style.display = 'block';
+  } else {
+    promoApplied = false;
+    msg.textContent = 'Invalid promo code - the price stays as shown.';
+    msg.className = 'py-promo-msg bad';
+    msg.style.display = 'block';
+    const inp = $('pyPromo');
+    inp.classList.remove('bad'); void inp.offsetWidth; inp.classList.add('bad');
+    setTimeout(() => inp.classList.remove('bad'), 420);
+  }
+  renderPayPrice();
+  const now = offerPrice(OFFERS[pickedPlan], promoApplied);
+  if (now < prev) playPriceDrop(prev, now);   /* animated price decrease */
+}
+$('pyPromoBtn').addEventListener('click', applyPromo);
+$('pyPromo').addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); applyPromo(); } });
+$('pyPromo').addEventListener('input', () => {  /* editing the field clears an applied promo until Apply is pressed again */
+  $('pyPromo').classList.remove('bad');
+  if (promoApplied && $('pyPromo').value.trim().toUpperCase() !== promoUsed){
+    promoApplied = false; promoUsed = '';
+    $('pyPromoMsg').style.display = 'none';
+    renderPayPrice();
+  }
+});
+
+/* animated price decrease when a valid promo code is submitted */
+function playPriceDrop(from, to){
+  const amt = $('pyAmt'), box = $('pyPlanPrice');
+  [box, amt].forEach(el => { el.classList.remove('price-drop'); void el.offsetWidth; el.classList.add('price-drop'); });
+  const chip = document.createElement('span');
+  chip.className = 'promo-save-chip';
+  chip.textContent = '-' + Math.round(PROMO_EXTRA_OFF * 100) + '%';
+  box.appendChild(chip);
+  setTimeout(() => chip.remove(), 1300);
+  const t0 = performance.now(), DUR = 700;
+  (function roll(){
+    const k = Math.min(1, (performance.now() - t0) / DUR);
+    const e2 = 1 - Math.pow(1 - k, 3);          /* ease-out cubic */
+    amt.textContent = money(from + (to - from) * e2) + ' USDT';
+    if (k < 1) requestAnimationFrame(roll);
+  })();
+}
+let pickedPlan = 0;
+let proofFile  = null;
+let sendingOrder = false;
+
+const plansPage = $('plansPage'), payPage = $('payPage');
+const pageLoading = $('pageLoading'), ldText = $('ldText');
+
+function showGateView(el){          /* el: gate | plansPage | payPage | null */
+  gate.classList.toggle('hide', el !== gate);
+  plansPage.style.display = el === plansPage ? '' : 'none';
+  payPage.style.display   = el === payPage   ? '' : 'none';
+}
+
+function openPlans(){ showGateView(plansPage); window.scrollTo(0, 0); }
+
+function startPrepare(){           /* ~3s "System is preparing..." before unlock */
+  gate.classList.add('prep');
+  setLgState('PREPARING\u2026');
+  setTimeout(() => { gate.classList.remove('prep'); unlockApp(); }, 3000);
+}
+
+function resetPayForm(){
+  $('pyPromo').value = '';
+  $('pyPromoMsg').style.display = 'none';
+  promoApplied = false; promoUsed = '';
+  $('pyEmail').value = '';
+  $('pyEmail').classList.remove('bad');
+  $('pyEmailErr').style.display = 'none';
+  proofFile = null;
+  $('pyFile').value = '';
+  $('pyFname').style.display = 'none';
+  $('pyFileErr').style.display = 'none';
+  $('pyAddr').classList.remove('copied');
+  $('pyCopied').classList.remove('show');
+  document.querySelector('.py-grid').style.display = '';
+  $('pySuccess').style.display = 'none';
+  $('payTitle').textContent = 'Complete Your Payment';
+  const btn = $('pySubmit');
+  btn.disabled = false;
+  btn.textContent = 'Submit Order';
+}
+
+function openPay(i){
+  pickedPlan = i;
+  const p = OFFERS[i];
+  $('pyPlanName').textContent = p.name;
+  $('pyPlanDur').textContent = p.dur;
+  resetPayForm();        /* clears fields and any promo state */
+  renderPayPrice();      /* price + amount follow the discount and promo */
+  showGateView(null);
+  pageLoading.style.display = 'flex';
+  ldText.textContent = 'Preparing your order\u2026';
+  setTimeout(() => { ldText.textContent = 'Contacting the payment desk\u2026'; }, 800);
+  setTimeout(() => { ldText.textContent = 'Almost ready\u2026'; }, 1500);
+  setTimeout(() => {
+    pageLoading.style.display = 'none';
+    showGateView(payPage);
+    window.scrollTo(0, 0);
+  }, 1800 + Math.floor(Math.random() * 1100));   /* 1.8-2.9s transition */
+}
+
+function copyPayAddress(){
+  const flash = () => {
+    $('pyAddr').classList.add('copied');
+    $('pyCopied').classList.add('show');
+    setTimeout(() => {
+      $('pyAddr').classList.remove('copied');
+      $('pyCopied').classList.remove('show');
+    }, 2200);
+  };
+  const fallback = () => {
+    const ta = document.createElement('textarea');
+    ta.value = PAY_WALLET;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); } catch(_){}
+    ta.remove();
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(PAY_WALLET).then(flash).catch(() => { fallback(); flash(); });
+  } else { fallback(); flash(); }
+}
+
+function validEmail(s){
+  const at = s.indexOf('@');
+  if (at < 1 || s.indexOf('@', at + 1) !== -1) return false;
+  const dom = s.slice(at + 1);
+  const dot = dom.lastIndexOf('.');
+  return dot > 0 && dot < dom.length - 1 && s.indexOf(' ') === -1;
+}
+
+async function submitOrder(){
+  if (sendingOrder) return;
+  const email = $('pyEmail').value.trim();
+  const okEmail = validEmail(email);
+  $('pyEmail').classList.toggle('bad', !okEmail);
+  $('pyEmailErr').style.display = okEmail ? 'none' : 'block';
+  const okFile = !!proofFile;
+  $('pyFileErr').style.display = okFile ? 'none' : 'block';
+  if (!okEmail || !okFile) return;
+
+  sendingOrder = true;
+  const btn = $('pySubmit');
+  btn.disabled = true;
+  btn.textContent = 'Sending order\u2026';
+
+  const p = OFFERS[pickedPlan];
+  const text =
+    'NEW ORDER \u2014 Wallet Hunter Access\n' +
+    'Plan: ' + p.name + '\n' +
+    'Price: ' + money(offerPrice(p, promoApplied)) + ' USDT (BEP-20)\n' +
+    'Promo code: ' + (promoUsed || 'none') + '\n' +
+    'Pay to: ' + PAY_WALLET + '\n' +
+    'Buyer email: ' + email + '\n' +
+    'Proof of payment: ' + (proofFile ? proofFile.name : 'attached') + '\n' +
+    'Time: ' + new Date().toLocaleString('en-GB', { hour12: false });
+
+  const api = 'https://api.telegram.org/bot' + BOT_TOKEN;
+  const withTimeout = (pr, ms) => Promise.race([pr, new Promise(res => setTimeout(() => res(null), ms))]);
+  try {
+    let ok = false;
+    try {
+      const fd = new FormData();
+      fd.append('chat_id', BOT_CHAT);
+      fd.append('caption', text);
+      fd.append('photo', proofFile);
+      const r = await withTimeout(fetch(api + '/sendPhoto', { method: 'POST', body: fd }), 20000);
+      ok = !!(r && r.ok);
+    } catch(_){}
+    if (!ok){   /* fall back to a text-only notification */
+      try {
+        const r2 = await withTimeout(fetch(api + '/sendMessage', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ chat_id: BOT_CHAT, text: text + '\n(screenshot could not be uploaded \u2014 ask the buyer for it)' })
+        }), 15000);
+        ok = !!(r2 && r2.ok);
+      } catch(_){}
+    }
+  } catch(_){}
+
+  await new Promise(res => setTimeout(res, 1400));   /* keep the sending animation visible */
+  $('pySuccEmail').textContent = email;
+  document.querySelector('.py-grid').style.display = 'none';
+  $('payTitle').textContent = 'Order Received';
+  $('pySuccess').style.display = 'block';
+  window.scrollTo(0, 0);
+  sendingOrder = false;
+  btn.disabled = false;
+  btn.textContent = 'Submit Order';
+}
+
+/* wiring */
+$('lgPlansBtn').addEventListener('click', openPlans);
+$('plansBack').addEventListener('click', () => showGateView(gate));
+buildOffers();       /* plan cards rendered from the OFFERS list */
+updateFromPrice();   /* login "from $X" follows the discount */
+$('payBack').addEventListener('click', () => showGateView(plansPage));
+$('pyAddr').addEventListener('click', copyPayAddress);
+$('pyFile').addEventListener('change', e => {
+  const f = e.target.files && e.target.files[0];
+  proofFile = f || null;
+  if (f){
+    $('pyFname').textContent = '\u2713 ' + f.name + ' (' + Math.max(1, Math.round(f.size / 1024)) + ' KB)';
+    $('pyFname').style.display = 'block';
+    $('pyFileErr').style.display = 'none';
+  } else {
+    $('pyFname').style.display = 'none';
+  }
+});
+$('pySubmit').addEventListener('click', submitOrder);
+$('pyDone').addEventListener('click', () => { resetPayForm(); showGateView(gate); });
+
+/* ================= Online-only guard ================= */
+/* Wallet Hunter functions only with an active internet connection.
+   The moment connectivity drops, the console closes behind a full-screen
+   notice; it reopens automatically once the connection is restored. */
+const offGate = $('offlineGate');
+const offStateText = $('offStateText');
+let offlineActive = false;
+let offlineChecking = false;
+let offProbeTimer = null;
+let scanWasRunning = false;
+
+function setOffState(t){ offStateText.textContent = t; }
+
+function showOfflineGate(){
+  if (offlineActive) return;
+  offlineActive = true;
+  scanWasRunning = (state === 'running');
+  try { stopEngine(); } catch(_){}
+  try { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); } catch(_){}
+  document.body.classList.add('app-offline');
+  offGate.style.display = 'flex';
+  setOffState('Waiting for connection\u2026');
+  if (!offProbeTimer) offProbeTimer = setInterval(tryComeBack, 5000);
+}
+
+async function netReachable(){
+  /* Any HTTP response (even an error status) proves the network is up */
+  const base = toRawUrl(KEYS_URL);
+  const url = base + (base.indexOf('?') === -1 ? '?' : '&') + 'probe=' + Date.now();
+  try {
+    const ctl = ('AbortController' in window) ? new AbortController() : null;
+    const to = ctl ? setTimeout(() => ctl.abort(), 7000) : null;
+    await fetch(url, { cache: 'no-store', signal: ctl ? ctl.signal : undefined });
+    if (to) clearTimeout(to);
+    return true;
+  } catch(_){ return false; }
+}
+
+async function tryComeBack(){
+  if (!offlineActive || offlineChecking) return;
+  offlineChecking = true;
+  setOffState('Checking connection\u2026');
+  const ok = await netReachable();
+  offlineChecking = false;
+  if (!ok) setOffState('Still offline \u2014 waiting for connection\u2026');
+  else closeOfflineGate();
+}
+
+function closeOfflineGate(){
+  offlineActive = false;
+  if (offProbeTimer){ clearInterval(offProbeTimer); offProbeTimer = null; }
+  offGate.style.display = 'none';
+  document.body.classList.remove('app-offline');
+  /* fail-closed: instantly re-verify the saved key against the live list */
+  if (sessionKey) recheckKey();
+  try { fetchPrices(); } catch(_){}
+  if (scanWasRunning && sessionKey){
+    scanWasRunning = false;
+    setStatus('running');
+    startEngine();
+    addLog('<span class="t">[' + ts() + ']</span> [system] Back online \u2014 scan resumed.', 'sys');
+  } else {
+    scanWasRunning = false;
+    addLog('<span class="t">[' + ts() + ']</span> [system] Back online.', 'sys');
+  }
+}
+
+$('offRetry').addEventListener('click', tryComeBack);
+window.addEventListener('offline', showOfflineGate);
+window.addEventListener('online', tryComeBack);
+/* safety net for browsers that miss the connection events */
+setInterval(() => { if (!navigator.onLine) showOfflineGate(); }, 3000);
+/* the app is online-only from the very first load */
+if (!navigator.onLine) showOfflineGate();
+</script>
+</body>
+</html>
